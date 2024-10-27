@@ -15,6 +15,7 @@ cd MicroHypervisor
 3. Initialize the submodules
 ```bash
 git submodule update --init --recursive
+```
 
 4. Open the solution file in Visual Studio 2022
 ```bash
