@@ -1,17 +1,21 @@
 #include "HypervisorStateMachine.h"
 #include <iostream>
+#include <limits>
+#include <conio.h>
 
 HypervisorStateMachine::HypervisorStateMachine(size_t memorySize)
     : memorySize_(memorySize), currentState_(State::Initializing), running_(false),
-    virtualProcessor_(nullptr), gui_(nullptr), g_pd3dDevice(NULL),
+    virtualProcessor_(nullptr), gui_(nullptr), g_pd3dDevice(NULL), g_pDXGIFactory(NULL),
     g_pd3dDeviceContext(NULL), g_pSwapChain(NULL), g_mainRenderTargetView(NULL), hwnd(NULL), 
-    interruptController_(partition_.GetHandle()), snapshotManager_(partition_.GetHandle()), partition_(), memoryManager_(partition_.GetHandle(), memorySize_)
+    interruptController_(partition_.GetHandle()), snapshotManager_(partition_.GetHandle()), partition_(), 
+    memoryManager_(partition_.GetHandle(), memorySize_), logger_("MicroHypervisor.log")
 {
-
+    logger_.Log(Logger::LogLevel::Info, "HypervisorStateMachine initialized.");
 }
 
 HypervisorStateMachine::~HypervisorStateMachine()
 {
+    logger_.Log(Logger::LogLevel::Info, "HypervisorStateMachine destroyed.");
     Stop();
     CleanupDeviceD3D();
 }
@@ -113,13 +117,101 @@ void HypervisorStateMachine::RunGui()
 void HypervisorStateMachine::CheckHypervisorCapability()
 {
     WHV_CAPABILITY capability = {};
-    HRESULT result = WHvGetCapability(WHvCapabilityCodeHypervisorPresent, &capability, sizeof(capability), nullptr);
+    HRESULT result;
+
+    result = WHvGetCapability(WHvCapabilityCodeHypervisorPresent, &capability, sizeof(capability), nullptr);
     if (result != S_OK || !capability.HypervisorPresent)
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Hypervisor platform not available.\n";
+        logger_.Log(Logger::LogLevel::Error, "Hypervisor platform not available.");
+        logger_.LogStackTrace();
         return;
     }
+
+    result = WHvGetCapability(WHvCapabilityCodeFeatures, &capability, sizeof(capability), nullptr);
+    if (result != S_OK)
+    {
+        TransitionState(State::Error);
+        logger_.Log(Logger::LogLevel::Error, "Failed to get hypervisor features capability.");
+        logger_.LogStackTrace();
+        return;
+    }
+
+    result = WHvGetCapability(WHvCapabilityCodeExtendedVmExits, &capability, sizeof(capability), nullptr);
+    if (result != S_OK)
+    {
+        TransitionState(State::Error);
+        logger_.Log(Logger::LogLevel::Error, "Failed to get extended VM exits capability.");
+        logger_.LogStackTrace();
+        return;
+    }
+
+    result = WHvGetCapability(WHvCapabilityCodeExceptionExitBitmap, &capability, sizeof(capability), nullptr);
+    if (result != S_OK)
+    {
+        TransitionState(State::Error);
+        logger_.Log(Logger::LogLevel::Error, "Failed to get exception exit bitmap capability.");
+        logger_.LogStackTrace();
+        return;
+    }
+
+    result = WHvGetCapability(WHvCapabilityCodeX64MsrExitBitmap, &capability, sizeof(capability), nullptr);
+    if (result != S_OK)
+    {
+        TransitionState(State::Error);
+        logger_.Log(Logger::LogLevel::Error, "Failed to get MSR exit bitmap capability.");
+        logger_.LogStackTrace();
+        return;
+    }
+
+    // GPA range populate flags
+    //result = WHvGetCapability(WHvCapabilityCodeGpaRangePopulateFlags, &capability, sizeof(capability), nullptr);
+    //if (result != S_OK)
+    //{
+    //    TransitionState(State::Error);
+    //    outputBuffer << "[Error]: Failed to get GPA range populate flags capability.\n";
+    //    return;
+    //}
+
+    //// sceduler features
+    //result = WHvGetCapability(WHvCapabilityCodeSchedulerFeatures, &capability, sizeof(capability), nullptr);
+    //if (result != S_OK)
+    //{
+    //    TransitionState(State::Error);
+    //    outputBuffer << "[Error]: Failed to get scheduler features capability.\n";
+    //    return;
+    //}
+
+    WHV_PROCESSOR_VENDOR vendor = {};
+    result = WHvGetCapability(WHvCapabilityCodeProcessorVendor, &vendor, sizeof(vendor), nullptr);
+    if (result == S_OK)
+    {
+        logger_.Log(Logger::LogLevel::Info, "Processor Vendor: " + std::to_string(vendor));
+        logger_.LogStackTrace();
+    }
+    else
+    {
+        TransitionState(State::Error);
+        logger_.Log(Logger::LogLevel::Error, "Failed to get processor vendor capability.");
+        logger_.LogStackTrace();
+        return;
+    }
+
+    WHV_PROCESSOR_FEATURES processorFeatures = {};
+    result = WHvGetCapability(WHvCapabilityCodeProcessorFeatures, &processorFeatures, sizeof(processorFeatures), nullptr);
+    if (result == S_OK)
+    {
+        logger_.Log(Logger::LogLevel::Info, "Processor Features: " + std::to_string(processorFeatures.IntelPrefetchSupport));
+        logger_.LogStackTrace();
+    }
+    else
+    {
+        TransitionState(State::Error);
+        logger_.Log(Logger::LogLevel::Error, "Failed to get processor features capability.");
+        logger_.LogStackTrace();
+        return;
+    }
+
     TransitionState(State::Ready);
 }
 
@@ -128,38 +220,45 @@ void HypervisorStateMachine::SetupPartition()
     if (!partition_.Setup())
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to set up the partition.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to set up the partition.");
+        logger_.LogStackTrace();
         return;
     }
 
     if (!partition_.CreateVirtualProcessor(0))
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to create virtual processor.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to create virtual processor.");
+        logger_.LogStackTrace();
         return;
     }
-    outputBuffer << "[Info]: Virtual processor created successfully.\n";
+    logger_.Log(Logger::LogLevel::Info, "Virtual processor created successfully.");
+    logger_.LogStackTrace();
 
     virtualProcessor_ = new VirtualProcessor(partition_.GetHandle(), 0);
     if (virtualProcessor_ == nullptr)
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to create VirtualProcessor instance.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to create VirtualProcessor instance.");
+        logger_.LogStackTrace();
         return;
     }
-    outputBuffer << "[Info]: VirtualProcessor instance created successfully.\n";
+    logger_.Log(Logger::LogLevel::Info, "VirtualProcessor instance created successfully.");
+    logger_.LogStackTrace();
 
     if (!interruptController_.Setup())
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to initialize Interrupt Controller.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to initialize Interrupt Controller.");
+        logger_.LogStackTrace();
         return;
     }
 
     if (!memoryManager_.Initialize())
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to initialize MemoryManager.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to initialize MemoryManager.");
+        logger_.LogStackTrace();
         return;
     }
 
@@ -171,19 +270,22 @@ void HypervisorStateMachine::InitializeComponents()
     if (!interruptController_.Setup())
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to initialize InterruptController.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to initialize Interrupt Controller.");
+        logger_.LogStackTrace();
         return;
     }
     if (!memoryManager_.Initialize())
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to initialize MemoryManager.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to initialize MemoryManager.");
+        logger_.LogStackTrace();
         return;
     }
     if (!snapshotManager_.Initialize())
     {
         TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to initialize SnapshotManager.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to initialize SnapshotManager.");
+        logger_.LogStackTrace();
         return;
     }
     TransitionState(State::Running);
@@ -192,17 +294,37 @@ void HypervisorStateMachine::InitializeComponents()
 bool HypervisorStateMachine::RunHypervisor()
 {
     running_ = true;
+
     while (running_)
     {
+        if (CheckForInterrupt())
+        {
+            MenuOption option = ShowMenu();
+            switch (option)
+            {
+            case MenuOption::Continue:
+                // Continue running the hypervisor
+                break;
+            case MenuOption::Restart:
+                // Restart logic
+                virtualProcessor_->RestoreState();
+                break;
+            case MenuOption::Stop:
+                running_ = false;
+                break;
+            }
+        }
+
         HRESULT hr = virtualProcessor_->SaveState();
         if (FAILED(hr))
         {
             TransitionState(State::Error);
-            outputBuffer << "[Error]: Failed to save the state of the virtual processor.\n";
+            logger_.Log(Logger::LogLevel::Error, "Failed to save the state of the virtual processor.");
             return false;
         }
 
-        // TODO: ADD simulate hypervisor running
+        // Simulate hypervisor running
+        virtualProcessor_->Run();
         virtualProcessor_->DumpRegisters();
         virtualProcessor_->DetailedDumpRegisters();
 
@@ -210,14 +332,30 @@ bool HypervisorStateMachine::RunHypervisor()
         if (FAILED(hr))
         {
             TransitionState(State::Error);
-            outputBuffer << "[Error]: Failed to restore the state of the virtual processor.\n";
+            logger_.Log(Logger::LogLevel::Error, "Failed to restore the state of the virtual processor.");
             return false;
         }
 
-        // ad any additional operations
+        // Add any additional operations
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+
     TransitionState(State::Stopped);
     return true;
+}
+
+bool HypervisorStateMachine::CheckForInterrupt()
+{
+    if (_kbhit())
+    {
+        char ch = _getch();
+        if (ch == '1' || ch == '2' || ch == '3')
+        {
+            pendingInterrupt_ = true;
+            return true;
+        }
+    }
+    return false;
 }
 
 void HypervisorStateMachine::PrintOutputBuffer()
@@ -243,18 +381,28 @@ void HypervisorStateMachine::TransitionState(State newState)
     {
     case State::Initializing:
         stateMessage = "[State]: Initializing\n";
+        logger_.Log(Logger::LogLevel::State, "Initializing Hypervisor.");
+        logger_.LogStackTrace();
         break;
     case State::Ready:
         stateMessage = "[State]: Ready\n";
+        logger_.Log(Logger::LogLevel::State, "Hypervisor is ready.");
+        logger_.LogStackTrace();
         break;
     case State::Running:
         stateMessage = "[State]: Running\n";
+        logger_.Log(Logger::LogLevel::State, "Hypervisor is running.");
+        logger_.LogStackTrace();
         break;
     case State::Stopped:
         stateMessage = "[State]: Stopped\n";
+        logger_.Log(Logger::LogLevel::State, "Hypervisor is stopped.");
+        logger_.LogStackTrace();
         break;
     case State::Error:
         stateMessage = "[State]: Error occurred\n";
+        logger_.Log(Logger::LogLevel::Error, "An error occurred in the Hypervisor.");
+        logger_.LogStackTrace();
         break;
     }
 
@@ -265,6 +413,7 @@ void HypervisorStateMachine::TransitionState(State newState)
 
     PrintOutputBuffer();
 }
+
 void HypervisorStateMachine::DisplayUsage()
 {
     std::cout << "Usage: MicroHypervisor [options]\n";
@@ -272,6 +421,78 @@ void HypervisorStateMachine::DisplayUsage()
     std::cout << "  -m, --memory <size>   Set the memory size in bytes (default: 4194304)\n";
     std::cout << "  --gui                 Launch GUI mode\n";
     std::cout << "  -h, --help            Show this help message\n";
+}
+
+HypervisorStateMachine::MenuOption HypervisorStateMachine::ShowMenu()
+{
+    int choice = 0;
+    std::cout << "Hypervisor Menu:\n";
+    std::cout << "1. Continue\n";
+    std::cout << "2. Restart\n";
+    std::cout << "3. Stop\n";
+    std::cout << "Select an option (1-3): ";
+
+    while (true)
+    {
+        if (_kbhit())
+        {
+            char ch = _getch();
+            switch (ch)
+            {
+            case '1': return MenuOption::Continue;
+            case '2': return MenuOption::Restart;
+            case '3': return MenuOption::Stop;
+            default:
+                std::cout << "Invalid choice. Please select a valid option (1-3): ";
+            }
+        }
+    }
+}
+
+bool HypervisorStateMachine::ParseArguments(int argc, char* argv[])
+{
+    for (int i = 1; i < argc; ++i)
+    {
+        if (strcmp(argv[i], "--memory") == 0 || strcmp(argv[i], "-m") == 0)
+        {
+            if (i + 1 < argc)
+            {
+                memorySize_ = std::stoull(argv[++i]);
+                logger_.Log(Logger::LogLevel::Info, "Memory size set to " + std::to_string(memorySize_) + " bytes.");
+            }
+            else
+            {
+                logger_.Log(Logger::LogLevel::Error, "--memory option requires a size argument.");
+                return false;
+            }
+        }
+        else if (strcmp(argv[i], "--gui") == 0)
+        {
+            guiMode_ = true;
+        }
+        else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0)
+        {
+            DisplayUsage();
+            return false;
+        }
+        else
+        {
+            logger_.Log(Logger::LogLevel::Error, "Unknown argument " + std::string(argv[i]));
+            DisplayUsage();
+            return false;
+        }
+    }
+    return true;
+}
+
+bool HypervisorStateMachine::IsGuiMode() const
+{
+	return guiMode_;
+}
+
+size_t HypervisorStateMachine::GetMemorySize() const
+{
+	return memorySize_;
 }
 
 bool HypervisorStateMachine::CreateDeviceD3D(HWND hWnd)
@@ -294,7 +515,8 @@ bool HypervisorStateMachine::CreateDeviceD3D(HWND hWnd)
 
     if (!hWnd)
     {
-        std::cerr << "[Error]: HWND is NULL in CreateDeviceD3D." << std::endl;
+        logger_.Log(Logger::LogLevel::Error, "HWND is NULL in CreateDeviceD3D.");
+        logger_.LogStackTrace();
         return false;
     }
 
@@ -304,7 +526,8 @@ bool HypervisorStateMachine::CreateDeviceD3D(HWND hWnd)
     HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
     if (FAILED(res))
     {
-        std::cerr << "[Error]: D3D11CreateDeviceAndSwapChain failed with HRESULT: 0x" << std::hex << res << std::endl;
+        logger_.Log(Logger::LogLevel::Error, "D3D11CreateDeviceAndSwapChain failed with HRESULT: 0x" + std::to_string(res));
+        logger_.LogStackTrace();
         return false;
     }
     if (res == DXGI_ERROR_UNSUPPORTED)
@@ -328,7 +551,17 @@ void HypervisorStateMachine::CreateRenderTarget()
 {
     ID3D11Texture2D* pBackBuffer;
     g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
-    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_mainRenderTargetView);
+    if (pBackBuffer == nullptr)
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to get back buffer from swap chain.");
+        logger_.LogStackTrace();
+		return;
+	}
+    else
+    {
+        g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_mainRenderTargetView);
+    }
+
     pBackBuffer->Release();
 }
 

@@ -110,7 +110,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>WinHvPlatform.lib;winhvemulation.lib;advapi32.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WinHvPlatform.lib;winhvemulation.lib;advapi32.lib;d3d11.lib;DbgHelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -132,6 +132,9 @@
   <ItemGroup>
     <ClInclude Include="Emulator.h" />
     <ClInclude Include="HypervisorStateMachine.h" />
+    <ClInclude Include="InterruptController.h" />
+    <ClInclude Include="Logger.h" />
+    <ClInclude Include="MemoryManager.h" />
     <ClInclude Include="Partition.h" />
     <ClInclude Include="Registers.h" />
     <ClInclude Include="SnapshotManager.h" />
@@ -148,10 +151,9 @@
     <ClCompile Include="Emulator.cpp" />
     <ClCompile Include="HypervisorStateMachine.cpp" />
     <ClCompile Include="InterruptController.cpp" />
-    <ClCompile Include="InterruptController.h" />
+    <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MemoryManager.cpp" />
-    <ClCompile Include="MemoryManager.h" />
     <ClCompile Include="Partition.cpp" />
     <ClCompile Include="SnapshotManager.cpp" />
     <ClCompile Include="Timer.cpp" />

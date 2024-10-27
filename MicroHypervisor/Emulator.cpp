@@ -1,8 +1,7 @@
 #include "Emulator.h"
-#include <WinHvEmulation.h>
 #include <iostream>
 
-LONG __stdcall IoPortCallback(void* Context, WHV_EMULATOR_IO_ACCESS_INFO* IoAccess)
+static LONG __stdcall EIoPortCallback(void* Context, WHV_EMULATOR_IO_ACCESS_INFO* IoAccess)
 {
     if (IoAccess->Direction == 0)
     {
@@ -34,7 +33,7 @@ LONG __stdcall IoPortCallback(void* Context, WHV_EMULATOR_IO_ACCESS_INFO* IoAcce
     return S_OK;
 }
 
-LONG __stdcall MemoryCallback(void* Context, WHV_EMULATOR_MEMORY_ACCESS_INFO* MemoryAccess)
+static LONG __stdcall EMemoryCallback(void* Context, WHV_EMULATOR_MEMORY_ACCESS_INFO* MemoryAccess)
 {
     if (MemoryAccess->Direction == 0)
     {
@@ -68,7 +67,7 @@ LONG __stdcall MemoryCallback(void* Context, WHV_EMULATOR_MEMORY_ACCESS_INFO* Me
     return S_OK;
 }
 
-LONG __stdcall GetVirtualProcessorRegistersCallback(void* Context, const WHV_REGISTER_NAME* RegisterNames, UINT32 RegisterCount, WHV_REGISTER_VALUE* RegisterValues)
+static LONG __stdcall EGetVirtualProcessorRegistersCallback(void* Context, const WHV_REGISTER_NAME* RegisterNames, UINT32 RegisterCount, WHV_REGISTER_VALUE* RegisterValues)
 {
     for (UINT32 i = 0; i < RegisterCount; ++i)
     {
@@ -78,7 +77,7 @@ LONG __stdcall GetVirtualProcessorRegistersCallback(void* Context, const WHV_REG
     return S_OK;
 }
 
-LONG __stdcall SetVirtualProcessorRegistersCallback(void* Context, const WHV_REGISTER_NAME* RegisterNames, UINT32 RegisterCount, const WHV_REGISTER_VALUE* RegisterValues)
+static LONG __stdcall ESetVirtualProcessorRegistersCallback(void* Context, const WHV_REGISTER_NAME* RegisterNames, UINT32 RegisterCount, const WHV_REGISTER_VALUE* RegisterValues)
 {
     for (UINT32 i = 0; i < RegisterCount; ++i)
     {
@@ -87,7 +86,7 @@ LONG __stdcall SetVirtualProcessorRegistersCallback(void* Context, const WHV_REG
     return S_OK;
 }
 
-LONG __stdcall TranslateGvaPageCallback(void* Context, WHV_GUEST_VIRTUAL_ADDRESS Gva, WHV_TRANSLATE_GVA_FLAGS TranslateFlags, WHV_TRANSLATE_GVA_RESULT_CODE* TranslationResult, UINT64* Gpa)
+static LONG __stdcall ETranslateGvaPageCallback(void* Context, WHV_GUEST_VIRTUAL_ADDRESS Gva, WHV_TRANSLATE_GVA_FLAGS TranslateFlags, WHV_TRANSLATE_GVA_RESULT_CODE* TranslationResult, UINT64* Gpa)
 {
     *Gpa = Gva;
     *TranslationResult = WHvTranslateGvaResultSuccess;
@@ -95,17 +94,17 @@ LONG __stdcall TranslateGvaPageCallback(void* Context, WHV_GUEST_VIRTUAL_ADDRESS
     return S_OK;
 }
 
-Emulator::Emulator() : handle_(nullptr)
+Emulator::Emulator() : handle_(nullptr), logger_("Emulator.log")
 {
     ZeroMemory(&callbacks_, sizeof(callbacks_));
     callbacks_.Size = sizeof(WHV_EMULATOR_CALLBACKS);
     callbacks_.Reserved = 0;
 
-    callbacks_.WHvEmulatorIoPortCallback = IoPortCallback;
-    callbacks_.WHvEmulatorMemoryCallback = MemoryCallback;
-    callbacks_.WHvEmulatorGetVirtualProcessorRegisters = GetVirtualProcessorRegistersCallback;
-    callbacks_.WHvEmulatorSetVirtualProcessorRegisters = SetVirtualProcessorRegistersCallback;
-    callbacks_.WHvEmulatorTranslateGvaPage = TranslateGvaPageCallback;
+    callbacks_.WHvEmulatorIoPortCallback = EIoPortCallback;
+    callbacks_.WHvEmulatorMemoryCallback = EMemoryCallback;
+    callbacks_.WHvEmulatorGetVirtualProcessorRegisters = EGetVirtualProcessorRegistersCallback;
+    callbacks_.WHvEmulatorSetVirtualProcessorRegisters = ESetVirtualProcessorRegistersCallback;
+    callbacks_.WHvEmulatorTranslateGvaPage = ETranslateGvaPageCallback;
 }
 
 Emulator::~Emulator()
@@ -122,20 +121,20 @@ bool Emulator::Initialize()
 
     if (result != S_OK)
     {
-        std::cerr << "[ERROR]: Emulator initialization failed with HRESULT: " << std::hex << result << std::dec << "\n";
+        logger_.Log(Logger::LogLevel::Error, "Emulator initialization failed with HRESULT: " + std::to_string(result));
         switch (result)
         {
         case E_INVALIDARG:
-            std::cerr << "[ERROR]: Invalid argument passed to WHvEmulatorCreateEmulator.\n";
+            logger_.Log(Logger::LogLevel::Error, "Invalid argument passed to WHvEmulatorCreateEmulator.");
             break;
         case E_NOTIMPL:
-            std::cerr << "[ERROR]: Operation not supported. Ensure that your system meets the requirements.\n";
+            logger_.Log(Logger::LogLevel::Error, "Operation not supported. Ensure that your system meets the requirements.");
             break;
         case E_OUTOFMEMORY:
-            std::cerr << "[ERROR]: Insufficient resources to create the emulator. Consider freeing up resources.\n";
+            logger_.Log(Logger::LogLevel::Error, "Insufficient resources to create the emulator. Consider freeing up resources.");
             break;
         default:
-            std::cerr << "[ERROR]: An unknown error occurred. HRESULT: " << std::hex << result << "\n";
+            logger_.Log(Logger::LogLevel::Error, "An unknown error occurred. HRESULT: " + std::to_string(result));
             break;
         }
         return false;

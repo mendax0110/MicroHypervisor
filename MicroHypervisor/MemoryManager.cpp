@@ -2,7 +2,10 @@
 #include <iostream>
 
 MemoryManager::MemoryManager(WHV_PARTITION_HANDLE partitionHandle, size_t memorySize)
-    : partitionHandle_(partitionHandle), memorySize_(memorySize) {}
+    : partitionHandle_(partitionHandle), memorySize_(memorySize), logger_("MemoryManager.log")
+{
+
+}
 
 MemoryManager::~MemoryManager() {}
 
@@ -32,7 +35,7 @@ UINT64 MemoryManager::TranslateGvaToGpa(UINT64 gva)
     }
     else
     {
-        std::cerr << "[Error]: Failed to translate GVA: " << std::hex << gva << std::dec << "\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to translate GVA: 0x%llx" + std::to_string(gva));
         return 0;
     }
 }

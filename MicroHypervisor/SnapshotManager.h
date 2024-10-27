@@ -1,9 +1,11 @@
-#pragma once
-#define _WIN32_WINNT 0x0A00
+#ifndef SNAPSHOTMANAGER_H
+#define SNAPSHOTMANAGER_H
+
 #include <vector>
 #include <Windows.h>
 #include <WinHvPlatform.h>
 #include <WinHvEmulation.h>
+#include "Logger.h"
 
 /// @brief Snapshot Manager class for the Hypervisor \class SnapshotManager
 class SnapshotManager
@@ -13,19 +15,19 @@ public:
     ~SnapshotManager();
 
     /**
-     * @brief 
+     * @brief Saves a snapshot of the current state of the partition
      * 
      */
     void SaveSnapshot();
 
     /**
-     * @brief 
+     * @brief Restores the snapshot of the partition
      * 
      */
     void RestoreSnapshot();
 
     /**
-     * @brief
+     * @brief Initializes the Snapshot Manager
      *
      */
     bool Initialize();
@@ -33,5 +35,7 @@ public:
 private:
     std::vector<WHV_REGISTER_VALUE> savedRegisters_;
     WHV_PARTITION_HANDLE partitionHandle_;
+    Logger logger_;
 };
-#pragma once
+
+#endif // SNAPSHOTMANAGER_H

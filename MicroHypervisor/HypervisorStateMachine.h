@@ -1,5 +1,6 @@
-#pragma once
-#define _WIN32_WINNT 0x0A00
+#ifndef HYPERVISOR_STATE_MACHINE_H
+#define HYPERVISOR_STATE_MACHINE_H
+
 #include <string>
 #include <atomic>
 #include <thread>
@@ -21,7 +22,7 @@
 #include "MemoryManager.h"
 #include "SnapshotManager.h"
 #include "Timer.h"
-
+#include "Logger.h"
 
 class HypervisorGUI;
 
@@ -33,26 +34,26 @@ public:
     ~HypervisorStateMachine();
 
     /**
-     * @brief 
+     * @brief Function to start the Hypervisor
      * 
      */
     void Start();
 
     /**
-     * @brief 
+     * @brief Function to stop the Hypervisor
      * 
      */
     void Stop();
 
     /**
-     * @brief 
+     * @brief Runs the GUI of the Hypervisor
      * 
-     * @param hwnd 
+     * @param hwnd -> HWND, Handle to the Window
      */
     void RunGUI(HWND hwnd);
 
     /**
-     * @brief 
+     * @brief Enum with the possible states of the Hypervisor
      * 
      */
     enum class State
@@ -65,40 +66,66 @@ public:
     };
 
     /**
-     * @brief 
+	 * @brief Enum with the possible menu options
+	 * 
+	 */
+    enum class MenuOption
+    {
+        Continue,
+        Restart,
+        Stop
+    };
+
+    /**
+	 * @brief Function to show the menu
+	 * 
+	 * @return MenuOption -> The selected menu option
+	 */
+    MenuOption ShowMenu();
+
+    /**
+	 * @brief Function to check for an interrupt
+	 * 
+	 * @return true -> if an interrupt is detected
+	 * @return false -> if no interrupt is detected
+	 */
+    bool CheckForInterrupt();
+
+    /**
+     * @brief Transition the state of the Hypervisor, from one state to another
      * 
-     * @param newState 
+     * @param newState -> State, the new state of the Hypervisor
      */
     void TransitionState(State newState);
 
     /**
-     * @brief 
+     * @brief Checks if the Hypervisor has the required capabilities
      * 
      */
     void CheckHypervisorCapability();
 
     /**
-     * @brief 
+     * @brief Function to setup the partition
      * 
      */
     void SetupPartition();
 
     /**
-     * @brief 
+     * @brief Function to initialize the components of the Hypervisor
      * 
      */
     void InitializeComponents();
 
     /**
-     * @brief 
+     * @brief Main loop of the Hypervisor, runs the Hypervisor
      * 
-     * @return true 
-     * @return false 
+     * @return true -> if the Hypervisor runs successfully
+     * @return false -> if the Hypervisor fails to run
      */
     bool RunHypervisor();
 
     /**
-     * @brief 
+     * @brief Abstract function to run the Hypervisor
      * 
      */
     void RunGui();
@@ -110,7 +137,7 @@ public:
     void CreateRenderTarget();
 
     /**
-     * @brief 
+     * @brief Cleans the Render Target object
      * 
      */
     void CleanupRenderTarget();
@@ -118,25 +145,50 @@ public:
     /**
      * @brief Create a Device D 3 D object
      * 
-     * @param hWnd 
-     * @return true 
-     * @return false 
+     * @param hWnd -> HWND, Handle to the Window
+     * @return true -> if the Device D3D is created successfully
+     * @return false -> if the Device D3D creation fails
      */
     bool CreateDeviceD3D(HWND hWnd);
 
     /**
-     * @brief 
+     * @brief Cleans the Device D3D object
      * 
      */
     void CleanupDeviceD3D();
 
     /**
-     * @brief 
+     * @brief Simple commandline menu for the Hypervisor
      * 
      */
     void DisplayUsage();
 
+    /**
+     * @brief Function to print the output buffer
+	 * 
+	 */
     void PrintOutputBuffer();
+
+    /**
+     * @brief Function to check if gui mode is enabled
+     *
+     */
+    bool IsGuiMode() const;
+
+    /**
+     * @brief Function to parse the arguments
+     * 
+     * @param argc -> int, Number of arguments
+     * @param argv -> char**, Arguments
+     */
+    bool ParseArguments(int argc, char* argv[]);
+
+    /**
+	 * @brief Function to get the memory size of the Hypervisor
+	 * 
+	 * @return size_t -> Memory size of the Hypervisor
+	 */
+    size_t GetMemorySize() const;
 
     IDXGISwapChain* g_pSwapChain;
     ID3D11Device* g_pd3dDevice;
@@ -154,6 +206,7 @@ private:
     InterruptController interruptController_;
     MemoryManager memoryManager_;
     SnapshotManager snapshotManager_;
+    Logger logger_;
 
     HypervisorGUI* gui_;
 
@@ -162,4 +215,9 @@ private:
     IDXGIFactory* g_pDXGIFactory;
 
     HWND hwnd;
+
+    bool guiMode_ = false;
+    volatile bool pendingInterrupt_ = false;
 };
+
+#endif // HYPERVISOR_STATE_MACHINE_H

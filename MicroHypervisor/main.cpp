@@ -34,54 +34,19 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
 int main(int argc, char* argv[])
 {
     size_t memorySize = 0x400000; // Default memory size: 4MB
-    bool guiMode = false;
 
-    for (int i = 1; i < argc; ++i)
+    HypervisorStateMachine tempHypervisor(memorySize);
+
+    if (!tempHypervisor.ParseArguments(argc, argv))
     {
-        std::string arg = argv[i];
-        if (arg == "-m" || arg == "--memory")
-        {
-            if (i + 1 < argc)
-            {
-                std::istringstream iss(argv[++i]);
-                if (!(iss >> memorySize) || memorySize == 0)
-                {
-                    std::cerr << "[Error]: Invalid memory size specified. Please provide a valid non-zero value.\n";
-                    return EXIT_FAILURE;
-                }
-            }
-            else
-            {
-                std::cerr << "[Error]: No memory size specified after -m/--memory option.\n";
-                return EXIT_FAILURE;
-            }
-        }
-        else if (arg == "--gui")
-        {
-            guiMode = true;
-        }
-        else if (arg == "-h" || arg == "--help")
-        {
-            std::cout << "Usage: MicroHypervisor [options]\n";
-            std::cout << "Options:\n";
-            std::cout << "  -m, --memory <size>   Set the memory size in bytes (default: 4194304)\n";
-            std::cout << "  --gui                  Launch GUI mode\n";
-            std::cout << "  -h, --help            Show this help message\n";
-            return EXIT_SUCCESS;
-        }
-        else
-        {
-            std::cerr << "[Error]: Unknown option " << arg << ". Use -h/--help for help.\n";
-            return EXIT_FAILURE;
-        }
+        return EXIT_FAILURE; 
     }
 
-    HypervisorStateMachine hypervisor(memorySize);
+    HypervisorStateMachine hypervisor(tempHypervisor.GetMemorySize());
     globalHypervisor = &hypervisor;
 
-    if (guiMode)
+    if (hypervisor.IsGuiMode())
     {
-        // Setup GUI Window and Direct3D device
         WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("MicroHypervisor"), NULL };
         RegisterClassEx(&wc);
 
@@ -104,6 +69,7 @@ int main(int argc, char* argv[])
         UpdateWindow(hwnd);
         hypervisor.RunGUI(hwnd);
 
+        // Cleanup
         hypervisor.CleanupDeviceD3D();
         DestroyWindow(hwnd);
         UnregisterClass(wc.lpszClassName, wc.hInstance);
@@ -114,4 +80,3 @@ int main(int argc, char* argv[])
 
     return EXIT_SUCCESS;
 }
-

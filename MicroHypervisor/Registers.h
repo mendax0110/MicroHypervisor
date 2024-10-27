@@ -1,5 +1,6 @@
-#pragma once
-#define _WIN32_WINNT 0x0A00
+#ifndef REGISTERS_H
+#define REGISTERS_H
+
 #include <Windows.h>
 #include <WinHvEmulation.h>
 #include <cstdint>
@@ -87,4 +88,5 @@ namespace PDE64
     constexpr uint32_t PS = (1u << 7);
     constexpr uint32_t G = (1u << 8);
 }
-#pragma once
+
+#endif // REGISTERS_H

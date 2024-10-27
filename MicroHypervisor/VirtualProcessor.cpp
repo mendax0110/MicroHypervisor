@@ -1,11 +1,11 @@
 #include "VirtualProcessor.h"
 #include <iostream>
 #include <iomanip>
-#include <WinHvEmulation.h>
 
 VirtualProcessor::VirtualProcessor(WHV_PARTITION_HANDLE partitionHandle, UINT index)
-    : partitionHandle_(partitionHandle), index_(index), registers_(std::size(regNames)), isRunning_(false), savedRegisters_() {}
-
+    : partitionHandle_(partitionHandle), index_(index), registers_(std::size(regNames)), 
+    isRunning_(false), savedRegisters_(), vmConfig_({1, 4194304, "none"}), logger_("VirtualProcessor.log")
+{}
 
 VirtualProcessor::~VirtualProcessor()
 {
@@ -98,7 +98,6 @@ void VirtualProcessor::DetailedDumpRegisters()
     std::cout << "----------------------------------------------------------------------------" << std::endl;
 }
 
-
 HRESULT VirtualProcessor::SaveState()
 {
     HRESULT hr = GetRegisters();
@@ -115,4 +114,34 @@ HRESULT VirtualProcessor::RestoreState()
 
     registers_ = savedRegisters_;
     return SetRegisters();
+}
+
+void VirtualProcessor::ConfigureVM(const VMConfig& config)
+{
+    vmConfig_ = config;
+    std::cout << "VM configured with "
+        << vmConfig_.cpuCount << " CPU(s), "
+        << vmConfig_.memorySize << " bytes of memory, "
+        << "I/O devices: " << vmConfig_.ioDevices << std::endl;
+}
+
+VirtualProcessor::VMConfig VirtualProcessor::GetVMConfig() const
+{
+    return vmConfig_;
+}
+
+void VirtualProcessor::Run()
+{
+    registers_[WHvX64RegisterRip].Reg64 = 0x1000;
+    SetRegisters();
+    WHvRunVirtualProcessor(partitionHandle_, index_, 0, 0);
+
+    if (GetSpecificRegister(WHvX64RegisterRip) == 0x1000)
+	{
+        logger_.Log(Logger::LogLevel::Info, "Virtual Processor is running.");
+	}
+	else
+	{
+        logger_.Log(Logger::LogLevel::Error, "Virtual Processor failed to run.");
+	}
 }

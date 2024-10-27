@@ -1,5 +1,6 @@
-#pragma once
-#define _WIN32_WINNT 0x0A00
+#ifndef TIMER_H
+#define TIMER_H
+
 #include <Windows.h>
 #include <chrono>
 #include <thread>
@@ -13,15 +14,15 @@ public:
     ~Timer();
 
     /**
-     * @brief 
+     * @brief Start the Timer with a specified interval and callback
      * 
-     * @param intervalMilliseconds 
-     * @param callback 
-     */
+     * @param intervalMilliseconds -> The interval in milliseconds
+     * @param callback ->  
+     */ 
     void Start(UINT32 intervalMilliseconds, std::function<void()> callback);
     
     /**
-     * @brief 
+     * @brief Stops the Timer
      * 
      */
     void Stop();
@@ -30,3 +31,5 @@ private:
     std::thread timerThread_;
     bool running_;
 };
+
+#endif // TIMER_H

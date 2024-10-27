@@ -3,8 +3,10 @@
 #include <iostream>
 
 InterruptController::InterruptController(WHV_PARTITION_HANDLE partitionHandle)
-    : partitionHandle_(partitionHandle) {}
+    : partitionHandle_(partitionHandle), logger_("InterruptController.log")
+{
 
+}
 
 InterruptController::~InterruptController() {}
 
@@ -23,13 +25,13 @@ bool InterruptController::Setup()
 
     if (FAILED(result))
     {
-        std::cerr << "[Error]: Failed to setup interrupt controller: HRESULT " << std::hex << result << std::dec << "\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to setup interrupt controller: HRESULT " + std::to_string(result));
         return false;
     }
     return true;
 }
 
-void InterruptController::InjectInterrupt(UINT32 interruptVector) const
+void InterruptController::InjectInterrupt(UINT32 interruptVector)
 {
     WHV_INTERRUPT_CONTROL interruptControl = {};
     interruptControl.Type = WHvX64PendingInterrupt;
@@ -42,10 +44,10 @@ void InterruptController::InjectInterrupt(UINT32 interruptVector) const
 
     if (FAILED(result))
     {
-        std::cerr << "[Error]: Failed to inject interrupt: HRESULT " << std::hex << result << std::dec << "\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to inject interrupt: HRESULT " + std::to_string(result));
     }
     else
     {
-        std::cout << "Injected interrupt vector: " << interruptVector << "\n";
+        logger_.Log(Logger::LogLevel::Info, "Injected interrupt vector: " + std::to_string(interruptVector));
     }
 }

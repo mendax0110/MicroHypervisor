@@ -1,10 +1,10 @@
-#pragma once
-#define _WIN32_WINNT 0x0A00
-#include <Windows.h>
-#include <map>
+#ifndef MEMORY_MANAGER_H
+#define MEMORY_MANAGER_H
+
 #include <Windows.h>
 #include <WinHvEmulation.h>
 #include <unordered_map>
+#include "Logger.h"
 
 /// @brief Memory Manager class for the Hypervisor \class MemoryManager
 class MemoryManager
@@ -14,18 +14,18 @@ public:
     ~MemoryManager();
 
     /**
-     * @brief 
-     * 
-     * @return true 
-     * @return false 
+     * @brief Initializes the Memory Manager
+     *
+     * @return true -> if the Memory Manager is initialized successfully
+     * @return false -> if the Memory Manager initialization fails
      */
     bool Initialize();
 
     /**
-     * @brief 
-     * 
-     * @param gva 
-     * @return UINT64 
+     * @brief Translates the Guest Virtual Address to Guest Physical Address
+     *
+     * @param gva -> UINT64, Guest Virtual Address for translation
+     * @return UINT64 -> Guest Physical Address, if translation is successful
      */
     UINT64 TranslateGvaToGpa(UINT64 gva);
 
@@ -33,4 +33,7 @@ private:
     WHV_PARTITION_HANDLE partitionHandle_;
     size_t memorySize_;
     std::unordered_map<UINT64, UINT64> pageTable_;
+    Logger logger_;
 };
+
+#endif // MEMORY_MANAGER_H
