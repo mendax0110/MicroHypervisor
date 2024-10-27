@@ -25,16 +25,36 @@
 
 class HypervisorGUI;
 
+/// @brief Hypervisor State Machine class for the Hypervisor \class HypervisorStateMachine
 class HypervisorStateMachine
 {
 public:
     HypervisorStateMachine(size_t memorySize);
     ~HypervisorStateMachine();
 
+    /**
+     * @brief 
+     * 
+     */
     void Start();
-    void Stop();
-    void RunGUI();
 
+    /**
+     * @brief 
+     * 
+     */
+    void Stop();
+
+    /**
+     * @brief 
+     * 
+     * @param hwnd 
+     */
+    void RunGUI(HWND hwnd);
+
+    /**
+     * @brief 
+     * 
+     */
     enum class State
     {
         Initializing,
@@ -44,17 +64,84 @@ public:
         Error
     };
 
+    /**
+     * @brief 
+     * 
+     * @param newState 
+     */
     void TransitionState(State newState);
+
+    /**
+     * @brief 
+     * 
+     */
     void CheckHypervisorCapability();
+
+    /**
+     * @brief 
+     * 
+     */
     void SetupPartition();
+
+    /**
+     * @brief 
+     * 
+     */
     void InitializeComponents();
+
+    /**
+     * @brief 
+     * 
+     * @return true 
+     * @return false 
+     */
     bool RunHypervisor();
+
+    /**
+     * @brief 
+     * 
+     */
     void RunGui();
+
+    /**
+     * @brief Create a Render Target object
+     * 
+     */
     void CreateRenderTarget();
+
+    /**
+     * @brief 
+     * 
+     */
     void CleanupRenderTarget();
+
+    /**
+     * @brief Create a Device D 3 D object
+     * 
+     * @param hWnd 
+     * @return true 
+     * @return false 
+     */
     bool CreateDeviceD3D(HWND hWnd);
+
+    /**
+     * @brief 
+     * 
+     */
     void CleanupDeviceD3D();
 
+    /**
+     * @brief 
+     * 
+     */
+    void DisplayUsage();
+
+    void PrintOutputBuffer();
+
+    IDXGISwapChain* g_pSwapChain;
+    ID3D11Device* g_pd3dDevice;
+
+private:
     size_t memorySize_;
     State currentState_;
     std::atomic<bool> running_;
@@ -70,13 +157,9 @@ public:
 
     HypervisorGUI* gui_;
 
-    ID3D11Device* g_pd3dDevice;
     ID3D11DeviceContext* g_pd3dDeviceContext;
-    IDXGISwapChain* g_pSwapChain;
     ID3D11RenderTargetView* g_mainRenderTargetView;
     IDXGIFactory* g_pDXGIFactory;
 
     HWND hwnd;
-
-    void DisplayUsage();
 };

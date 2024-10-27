@@ -29,8 +29,9 @@ void HypervisorStateMachine::Stop()
     running_ = false;
 }
 
-void HypervisorStateMachine::RunGUI()
+void HypervisorStateMachine::RunGUI(HWND hwnd)
 {
+    this->hwnd = hwnd;
     RunGui();
 }
 
@@ -131,25 +132,27 @@ void HypervisorStateMachine::SetupPartition()
         return;
     }
 
-    if (!interruptController_.Setup())
-    {
-        TransitionState(State::Error);
-        outputBuffer << "[Error]: Failed to initialize Interrupt Controller.\n";
-        return;
-    }
-
     if (!partition_.CreateVirtualProcessor(0))
     {
         TransitionState(State::Error);
         outputBuffer << "[Error]: Failed to create virtual processor.\n";
         return;
     }
+    outputBuffer << "[Info]: Virtual processor created successfully.\n";
 
     virtualProcessor_ = new VirtualProcessor(partition_.GetHandle(), 0);
     if (virtualProcessor_ == nullptr)
     {
         TransitionState(State::Error);
         outputBuffer << "[Error]: Failed to create VirtualProcessor instance.\n";
+        return;
+    }
+    outputBuffer << "[Info]: VirtualProcessor instance created successfully.\n";
+
+    if (!interruptController_.Setup())
+    {
+        TransitionState(State::Error);
+        outputBuffer << "[Error]: Failed to initialize Interrupt Controller.\n";
         return;
     }
 
@@ -162,7 +165,6 @@ void HypervisorStateMachine::SetupPartition()
 
     TransitionState(State::Ready);
 }
-
 
 void HypervisorStateMachine::InitializeComponents()
 {
@@ -218,31 +220,51 @@ bool HypervisorStateMachine::RunHypervisor()
     return true;
 }
 
-
-void HypervisorStateMachine::TransitionState(State newState)
+void HypervisorStateMachine::PrintOutputBuffer()
 {
-    currentState_ = newState;
-    std::lock_guard<std::mutex> lock(outputMutex);
-    switch (newState)
+    std::string output;
     {
-    case State::Initializing:
-        outputBuffer << "[State]: Initializing\n";
-        break;
-    case State::Ready:
-        outputBuffer << "[State]: Ready\n";
-        break;
-    case State::Running:
-        outputBuffer << "[State]: Running\n";
-        break;
-    case State::Stopped:
-        outputBuffer << "[State]: Stopped\n";
-        break;
-    case State::Error:
-        outputBuffer << "[State]: Error occurred\n";
-        break;
+        std::lock_guard<std::mutex> lock(outputMutex);
+        output = outputBuffer.str();
+        outputBuffer.str("");
+        outputBuffer.clear();
+    }
+
+    if (!output.empty())
+    {
+        std::cout << output;
     }
 }
 
+void HypervisorStateMachine::TransitionState(State newState)
+{
+    std::string stateMessage;
+    switch (newState)
+    {
+    case State::Initializing:
+        stateMessage = "[State]: Initializing\n";
+        break;
+    case State::Ready:
+        stateMessage = "[State]: Ready\n";
+        break;
+    case State::Running:
+        stateMessage = "[State]: Running\n";
+        break;
+    case State::Stopped:
+        stateMessage = "[State]: Stopped\n";
+        break;
+    case State::Error:
+        stateMessage = "[State]: Error occurred\n";
+        break;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(outputMutex);
+        outputBuffer << stateMessage;
+    }
+
+    PrintOutputBuffer();
+}
 void HypervisorStateMachine::DisplayUsage()
 {
     std::cout << "Usage: MicroHypervisor [options]\n";
@@ -270,52 +292,29 @@ bool HypervisorStateMachine::CreateDeviceD3D(HWND hWnd)
     sd.Windowed = TRUE;
     sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
-    UINT createDeviceFlags = 0;
-    D3D_FEATURE_LEVEL featureLevel;
-    const D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0 };
-
-    HRESULT res = D3D11CreateDeviceAndSwapChain(
-        nullptr,
-        D3D_DRIVER_TYPE_HARDWARE,
-        nullptr,
-        createDeviceFlags,
-        featureLevels,
-        ARRAYSIZE(featureLevels),
-        D3D11_SDK_VERSION,
-        &sd,
-        &g_pSwapChain,
-        &g_pd3dDevice,
-        &featureLevel,
-        &g_pd3dDeviceContext
-    );
-
-    if (res == DXGI_ERROR_UNSUPPORTED)
+    if (!hWnd)
     {
-        res = D3D11CreateDeviceAndSwapChain(
-            nullptr,
-            D3D_DRIVER_TYPE_WARP,
-            nullptr,
-            createDeviceFlags,
-            featureLevels,
-            ARRAYSIZE(featureLevels), 
-            D3D11_SDK_VERSION,
-            &sd,
-            &g_pSwapChain,
-            &g_pd3dDevice,
-            &featureLevel,
-            &g_pd3dDeviceContext
-        );
-    }
-
-    if (res != S_OK)
-    {
+        std::cerr << "[Error]: HWND is NULL in CreateDeviceD3D." << std::endl;
         return false;
     }
+
+    UINT createDeviceFlags = 0;
+    D3D_FEATURE_LEVEL featureLevel;
+    const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
+    HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
+    if (FAILED(res))
+    {
+        std::cerr << "[Error]: D3D11CreateDeviceAndSwapChain failed with HRESULT: 0x" << std::hex << res << std::endl;
+        return false;
+    }
+    if (res == DXGI_ERROR_UNSUPPORTED)
+        res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
+    if (res != S_OK)
+        return false;
 
     CreateRenderTarget();
     return true;
 }
-
 
 void HypervisorStateMachine::CleanupDeviceD3D()
 {
@@ -337,24 +336,3 @@ void HypervisorStateMachine::CleanupRenderTarget()
 {
     if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = NULL; }
 }
-
-//TODO: UNCOMMENT AS SOON AS WE USE THE STATE MACHINE
-//LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-//{
-//    switch (msg)
-//    {
-//    case WM_SIZE:
-//        return 0;
-//    case WM_SYSCOMMAND:
-//        if ((wParam & 0xFFF0) == SC_CLOSE)
-//        {
-//            PostQuitMessage(0);
-//        }
-//        return 0;
-//    case WM_DESTROY:
-//        PostQuitMessage(0);
-//        return 0;
-//    default:
-//        return DefWindowProc(hWnd, msg, wParam, lParam);
-//    }
-//}
