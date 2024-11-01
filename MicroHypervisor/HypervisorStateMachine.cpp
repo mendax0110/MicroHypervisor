@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include "HypervisorStateMachine.h"
 #include <iostream>
 #include <limits>
@@ -277,6 +278,77 @@ void HypervisorStateMachine::RunGui()
     CleanupDeviceD3D();
     DestroyWindow(hwnd);
     UnregisterClass(wc.lpszClassName, wc.hInstance);
+}
+
+void HypervisorStateMachine::RunCli()
+{
+    std::string input;
+
+    while (true)
+    {
+        DisplayUsageAndMenu(); // Call the merged function
+
+        while (!_kbhit())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        char ch = _getch();
+        if (ch == 'q' || ch == 'Q')
+        {
+            break;
+        }
+
+        switch (ch) {
+        case '1':
+            HandleMenuOption(MenuOption::Start);
+            break;
+        case '2':
+            HandleMenuOption(MenuOption::Stop);
+            break;
+        case '3':
+            HandleMenuOption(MenuOption::Restart);
+            break;
+        case '4':
+            HandleMenuOption(MenuOption::SaveSnapshot);
+            break;
+        case '5':
+            HandleMenuOption(MenuOption::RestoreSnapshot);
+            break;
+        case '6':
+            HandleMenuOption(MenuOption::DumpRegisters);
+            break;
+        case '7':
+            HandleMenuOption(MenuOption::SetRegisters);
+            break;
+        case '8':
+            HandleMenuOption(MenuOption::GetRegisters);
+            break;
+        case '9':
+            UpdateMemorySize();
+            break;
+        default:
+            std::cout << "Unknown command. Please try again.\n";
+            break;
+        }
+    }
+}
+
+void HypervisorStateMachine::UpdateMemorySize()
+{
+    std::cout << "Enter new memory size (in bytes): ";
+    std::size_t newSize;
+    std::cin >> newSize;
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    if (newSize > 0)
+    {
+        memorySize_ = newSize;
+        std::cout << "Memory size updated to " << memorySize_ << " bytes.\n";
+    }
+    else
+    {
+        std::cout << "Invalid memory size.\n";
+    }
 }
 
 void HypervisorStateMachine::CheckHypervisorCapability()
@@ -749,13 +821,27 @@ void HypervisorStateMachine::TransitionState(State newState)
     PrintOutputBuffer();
 }
 
-void HypervisorStateMachine::DisplayUsage()
+void HypervisorStateMachine::DisplayUsageAndMenu()
 {
+    std::cout << "#######################################################################\n";
     std::cout << "Usage: MicroHypervisor [options]\n";
     std::cout << "Options:\n";
     std::cout << "  -m, --memory <size>   Set the memory size in bytes (default: 4194304)\n";
     std::cout << "  --gui                 Launch GUI mode\n";
-    std::cout << "  -h, --help            Show this help message\n";
+    std::cout << "  -h, --help            Show this help message\n\n";
+
+    std::cout << "Hypervisor CLI Menu:\n"
+        << "1. Start\n"
+        << "2. Stop\n"
+        << "3. Restart\n"
+        << "4. Save Snapshot\n"
+        << "5. Restore Snapshot\n"
+        << "6. Dump Registers\n"
+        << "7. Set Registers\n"
+        << "8. Get Registers\n"
+        << "9. Set Memory Size\n"
+        << "q. Quit\n"
+        << "Select an option: ";
 }
 
 HypervisorStateMachine::MenuOption HypervisorStateMachine::ShowMenu()
@@ -807,13 +893,13 @@ bool HypervisorStateMachine::ParseArguments(int argc, char* argv[])
         }
         else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0)
         {
-            DisplayUsage();
+            DisplayUsageAndMenu();
             return false;
         }
         else
         {
             logger_.Log(Logger::LogLevel::Error, "Unknown argument " + std::string(argv[i]));
-            DisplayUsage();
+            DisplayUsageAndMenu();
             return false;
         }
     }

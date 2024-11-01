@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        hypervisor.Start();
+        hypervisor.RunCli();
     }
 
     return EXIT_SUCCESS;

@@ -81,6 +81,22 @@ public:
     };
 
     /**
+     * @brief Mapping of commands
+     *
+     */
+    std::unordered_map<std::string, MenuOption> commandMap = {
+        {"start", MenuOption::Start},
+        {"stop", MenuOption::Stop},
+        {"restart", MenuOption::Restart},
+        {"save snapshot", MenuOption::SaveSnapshot},
+        {"restore snapshot", MenuOption::RestoreSnapshot},
+        {"dump registers", MenuOption::DumpRegisters},
+        {"set registers", MenuOption::SetRegisters},
+        {"get registers", MenuOption::GetRegisters},
+        {"set memory size", MenuOption::Continue}
+    };
+
+    /**
 	 * @brief Function to show the menu
 	 * 
 	 * @return MenuOption -> The selected menu option
@@ -129,10 +145,28 @@ public:
     bool RunHypervisor();
 
     /**
-     * @brief Abstract function to run the Hypervisor
+     * @brief Abstract function to run the Hypervisor via Gui
      * 
      */
     void RunGui();
+
+    /**
+     * @brief Abstract function to run the Hypervisor via Cli
+     *
+     */
+    void RunCli();
+
+    /**
+     * @brief Adapt memory size
+     *
+     */
+    void UpdateMemorySize();
+
+    /**
+     * @brief Function to diplay cli menu
+     *
+     */
+    void DisplayUsageAndMenu();
 
     /**
      * @brief Create a Render Target object
@@ -160,12 +194,6 @@ public:
      * 
      */
     void CleanupDeviceD3D();
-
-    /**
-     * @brief Simple commandline menu for the Hypervisor
-     * 
-     */
-    void DisplayUsage();
 
     /**
      * @brief Function to print the output buffer
