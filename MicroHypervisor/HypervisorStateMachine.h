@@ -46,13 +46,6 @@ public:
     void Stop();
 
     /**
-     * @brief Runs the GUI of the Hypervisor
-     * 
-     * @param hwnd -> HWND, Handle to the Window
-     */
-    void RunGUI(HWND hwnd);
-
-    /**
      * @brief Enum with the possible states of the Hypervisor
      * 
      */
@@ -73,7 +66,18 @@ public:
     {
         Continue,
         Restart,
-        Stop
+        Stop,
+        Start,
+        SaveSnapshot,
+        RestoreSnapshot,
+        DumpRegisters,
+        DetailedDumpRegisters,
+        SetRegisters,
+        GetRegisters,
+        SetSpecificRegister,
+        GetSpecificRegister,
+        ConfigureVM,
+        GetVMConfig,
     };
 
     /**
@@ -190,6 +194,13 @@ public:
 	 */
     size_t GetMemorySize() const;
 
+    /**
+     * @brief Function to handle the menu option
+     *
+     * @param option -> MenuOption, The selected menu option
+     */
+    void HandleMenuOption(MenuOption option);
+
     IDXGISwapChain* g_pSwapChain;
     ID3D11Device* g_pd3dDevice;
 
@@ -198,6 +209,7 @@ private:
     State currentState_;
     std::atomic<bool> running_;
     std::mutex outputMutex;
+    std::mutex stateMutex;
     std::stringstream outputBuffer;
 
     Partition partition_;

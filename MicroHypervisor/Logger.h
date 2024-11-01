@@ -13,11 +13,15 @@
 #include <dbghelp.h>
 #include <sstream>
 #include <iomanip> 
+#include <queue>
+#include <functional>
 
 /// @brief Logger class for the HyperVisor \class Logger
 class Logger
 {
 public:
+	using LogCallback = std::function<void(const std::string&)>;
+
 	Logger(const std::string& logFile);
 	~Logger();
 
@@ -80,12 +84,32 @@ public:
 	 */
 	void LogStackTrace();
 
+	/**
+	 * @brief Processes the output buffer
+	 * 
+	 */
+	void ProcessOutputBuffer();
+
+	/**
+	 * @brief Sets the log callback
+	 * 
+	 * @param callback -> The callback to set
+	 */
+	void SetLogCallback(LogCallback callback);
+
 private:
 	std::ofstream logStream_;
 	std::mutex mutex_;
 	std::stack<std::string> logStack_;
 	std::stack<LogLevel> logLevelStack_;
 	bool errorOccurred_ = false;
+	bool stopLogging_ = false;
+	std::thread logThread_;
+	std::condition_variable cv_;
+	std::queue<std::string> outputBuffer_;
+	LogCallback logCallback_;
+	static bool dbg_;
+	static std::mutex dbgMutex_;
 
 	/**
 	 * @brief Gets the current time

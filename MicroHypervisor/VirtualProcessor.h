@@ -42,6 +42,10 @@ public:
      */
     VMConfig GetVMConfig() const;
 
+    /**
+     * @brief Starts the Virtual Processor
+     *
+     */
     void Run();
     
     /**
@@ -85,7 +89,7 @@ public:
      * @param regName -> WHV_REGISTER_NAME
      * @return UINT64 -> Register value
      */
-    UINT64 GetSpecificRegister(WHV_REGISTER_NAME regName) const;
+    UINT64 GetSpecificRegister(WHV_REGISTER_NAME regName);
 
     /**
      * @brief Save the state of the Virtual Processor
@@ -100,6 +104,15 @@ public:
      * @return HRESULT -> S_OK if successful
      */
     HRESULT RestoreState();
+
+    /**
+     * @brief Get the CPU Usage
+     *
+     */
+    UINT64 GetCPUUsage();
+
+    // GetActiveThreadCount() 
+    UINT GetActiveThreadCount();
 
 private:
     UINT index_;

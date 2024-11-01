@@ -29,6 +29,16 @@ public:
      */
     UINT64 TranslateGvaToGpa(UINT64 gva);
 
+    /**
+     * @brief Updates the Memory Size of the Partition
+     *
+     * @param newMemorySize -> size_t, New Memory Size
+     */
+    void UpdateMemorySize(size_t newMemorySize);
+
+    // method GetCurrentUsage()
+    UINT64 GetCurrentUsage();
+
 private:
     WHV_PARTITION_HANDLE partitionHandle_;
     size_t memorySize_;

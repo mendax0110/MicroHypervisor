@@ -1,6 +1,7 @@
 #include "VirtualProcessor.h"
 #include <iostream>
 #include <iomanip>
+#include "InterruptController.h"
 
 VirtualProcessor::VirtualProcessor(WHV_PARTITION_HANDLE partitionHandle, UINT index)
     : partitionHandle_(partitionHandle), index_(index), registers_(std::size(regNames)), 
@@ -14,12 +15,44 @@ VirtualProcessor::~VirtualProcessor()
 
 HRESULT VirtualProcessor::GetRegisters()
 {
-    return WHvGetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), registers_.data());
+    auto result = WHvGetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), registers_.data());
+    if (FAILED(result))
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to get registers: HRESULT " 
+            + std::to_string(result) + ", index = " 
+            + std::to_string(index_) + ", partitionHandle = " 
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+        return result;
+    }
+    else
+    {
+        logger_.Log(Logger::LogLevel::Info, "Registers retrieved successfully." 
+            + std::to_string(result) + ", index = " 
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+		return result;
+    }
 }
 
 HRESULT VirtualProcessor::SetRegisters()
 {
-    return WHvSetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), registers_.data());
+    auto result = WHvSetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), registers_.data());
+    if (FAILED(result))
+	{
+		logger_.Log(Logger::LogLevel::Error, "Failed to set registers: HRESULT " 
+            + std::to_string(result) + ", index = " 
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+        return result;
+	}
+    else
+    {
+        logger_.Log(Logger::LogLevel::Info, "Registers set successfully." 
+            + std::to_string(result) + ", index = " 
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+        return result;
+    }
 }
 
 HRESULT VirtualProcessor::SetSpecificRegister(WHV_REGISTER_NAME regName, UINT64 value)
@@ -29,19 +62,58 @@ HRESULT VirtualProcessor::SetSpecificRegister(WHV_REGISTER_NAME regName, UINT64 
         if (regNames[i] == regName)
         {
             registers_[i].Reg64 = value;
-            return S_OK;
+            auto result = WHvSetVirtualProcessorRegisters(partitionHandle_, index_, &regName, 1, &registers_[i]);
+            if (FAILED(result))
+            {
+                logger_.Log(Logger::LogLevel::Error, "Failed to set specific register: HRESULT " 
+                    + std::to_string(result) + ", regName = " 
+                    + std::to_string(regName) + ", value = "
+                    + std::to_string(value) + ", index = "
+                    + std::to_string(index_) + ", partitionHandle = "
+                    + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+				return result;
+            }
+            else
+            {
+                logger_.Log(Logger::LogLevel::Info, "Specific register set successfully." 
+                    + std::to_string(result) + ", regName = " 
+                    + std::to_string(regName) + ", value = "
+                    + std::to_string(value) + ", index = "
+                    + std::to_string(index_) + ", partitionHandle = "
+                    + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+                return result;
+            }
         }
     }
     return E_INVALIDARG;
 }
 
-UINT64 VirtualProcessor::GetSpecificRegister(WHV_REGISTER_NAME regName) const
+UINT64 VirtualProcessor::GetSpecificRegister(WHV_REGISTER_NAME regName)
 {
     for (size_t i = 0; i < std::size(regNames); ++i)
     {
         if (regNames[i] == regName)
         {
             return registers_[i].Reg64;
+            auto result = WHvGetVirtualProcessorRegisters(partitionHandle_, index_, &regName, 1, &registers_[i]);
+            if (FAILED(result))
+            {
+                logger_.Log(Logger::LogLevel::Error, "Failed to get specific register: HRESULT " 
+                    + std::to_string(result) + ", regName = " 
+                    + std::to_string(regName) + ", index = "
+                    + std::to_string(index_) + ", partitionHandle = "
+                    + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+                return registers_[i].Reg64;
+            }
+            else
+            {
+                logger_.Log(Logger::LogLevel::Info, "Specific register retrieved successfully." 
+                    + std::to_string(result) + ", regName = " 
+                    + std::to_string(regName) + ", index = "
+                    + std::to_string(index_) + ", partitionHandle = "
+                    + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+                return registers_[i].Reg64;
+            }
         }
     }
     return 0;
@@ -105,6 +177,24 @@ HRESULT VirtualProcessor::SaveState()
 
     savedRegisters_ = registers_;
     isRunning_ = true;
+
+    auto result = WHvGetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), savedRegisters_.data());
+    if (FAILED(result))
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to save state: HRESULT " 
+            + std::to_string(result) + ", index = "
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+		return result;
+    }
+    else
+    {
+        logger_.Log(Logger::LogLevel::Info, "State saved successfully." 
+            + std::to_string(result) + ", index = "
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+    }
+
     return S_OK;
 }
 
@@ -113,6 +203,24 @@ HRESULT VirtualProcessor::RestoreState()
     if (!isRunning_) return E_FAIL;
 
     registers_ = savedRegisters_;
+
+    auto result = WHvSetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), registers_.data());
+    if (FAILED(result))
+	{
+		logger_.Log(Logger::LogLevel::Error, "Failed to restore state: HRESULT " 
+            + std::to_string(result) + ", index = "
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+		return result;
+	}
+    else
+    {
+        logger_.Log(Logger::LogLevel::Info, "State restored successfully."
+            + std::to_string(result) + ", index = "
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+    }
+
     return SetRegisters();
 }
 
@@ -130,18 +238,86 @@ VirtualProcessor::VMConfig VirtualProcessor::GetVMConfig() const
     return vmConfig_;
 }
 
+UINT64 VirtualProcessor::GetCPUUsage()
+{
+    UINT64 cpuUsage = 0;
+    //HRESULT result = WHvGetVirtualProcessorCounters(partitionHandle_, index_, WHV_PROCESSOR_COUNTER_SET(0), 0, cpuUsage, nullptr);
+
+    //if (FAILED(result))
+    //{
+    //    logger_.Log(Logger::LogLevel::Error, "Failed to get CPU usage: HRESULT "
+    //        + std::to_string(result) + ", index = "
+    //        + std::to_string(index_) + ", partitionHandle = "
+    //        + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+    //    return 0;
+    //}
+
+    //logger_.Log(Logger::LogLevel::Info, "CPU usage retrieved successfully: "
+    //    + std::to_string(cpuUsage) + ", index = "
+    //    + std::to_string(index_) + ", partitionHandle = "
+    //    + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+
+    return cpuUsage;
+}
+
+UINT VirtualProcessor::GetActiveThreadCount()
+{
+    UINT32 activeThreadCount = 0;
+    //HRESULT result = WHvGetVirtualProcessorCounters(partitionHandle_, index_, WHV_PROCESSOR_COUNTER_SET(1), 0, activeThreadCount, nullptr);
+
+    //if (FAILED(result))
+    //{
+    //    logger_.Log(Logger::LogLevel::Error, "Failed to get active thread count: HRESULT "
+    //        + std::to_string(result) + ", index = "
+    //        + std::to_string(index_) + ", partitionHandle = "
+    //        + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+    //    return 0;
+    //}
+
+    //logger_.Log(Logger::LogLevel::Info, "Active thread count retrieved successfully: "
+    //    + std::to_string(activeThreadCount) + ", index = "
+    //    + std::to_string(index_) + ", partitionHandle = "
+    //    + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+
+    return activeThreadCount;
+}
+
 void VirtualProcessor::Run()
 {
-    registers_[WHvX64RegisterRip].Reg64 = 0x1000;
-    SetRegisters();
-    WHvRunVirtualProcessor(partitionHandle_, index_, 0, 0);
+    //TODO FIX THIS!!!!
+    //SetRegisters();
+    SetSpecificRegister(WHvX64RegisterRip, 0x1000);
+    SetSpecificRegister(WHvX64RegisterRflags, 0x2);
+    SetSpecificRegister(WHvX64RegisterCs, 0x8);
+    
+    if (partitionHandle_ == nullptr)
+    {
+        logger_.Log(Logger::LogLevel::Error, "Partition handle is invalid. Cannot run virtual processor.");
+        return;
+    }
 
-    if (GetSpecificRegister(WHvX64RegisterRip) == 0x1000)
+    //TODO FIX THIS!!!!
+    auto result = WHvRunVirtualProcessor(partitionHandle_, index_, 0, 0);
+
+    if (result == S_OK)
 	{
-        logger_.Log(Logger::LogLevel::Info, "Virtual Processor is running.");
-	}
-	else
-	{
-        logger_.Log(Logger::LogLevel::Error, "Virtual Processor failed to run.");
-	}
+		logger_.Log(Logger::LogLevel::Info, "Virtual Processor is running.");
+
+		// Inject an interrupt
+		InterruptController interruptController(partitionHandle_);
+		if (interruptController.Setup())
+		{
+			interruptController.InjectInterrupt(0x20);
+		}
+		else
+		{
+			logger_.Log(Logger::LogLevel::Error, "Failed to setup Interrupt Controller.");
+			logger_.LogStackTrace();
+        }
+    }
+    else
+    {
+        logger_.Log(Logger::LogLevel::Error, "Virtual Processor failed to run." + std::to_string(result));
+        logger_.LogStackTrace();
+    }
 }

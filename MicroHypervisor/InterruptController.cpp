@@ -37,6 +37,9 @@ void InterruptController::InjectInterrupt(UINT32 interruptVector)
     interruptControl.Type = WHvX64PendingInterrupt;
     interruptControl.Vector = interruptVector;
     interruptControl.Reserved = 0;
+    interruptControl.TriggerMode = WHvX64InterruptTriggerModeEdge;
+
+    logger_.Log(Logger::LogLevel::Error, "Injecting interrupt vector: " + std::to_string(interruptVector));
 
     auto result = WHvSetVirtualProcessorInterruptControllerState(
         partitionHandle_, 0, &interruptControl, sizeof(interruptControl)
@@ -44,7 +47,11 @@ void InterruptController::InjectInterrupt(UINT32 interruptVector)
 
     if (FAILED(result))
     {
-        logger_.Log(Logger::LogLevel::Error, "Failed to inject interrupt: HRESULT " + std::to_string(result));
+        logger_.Log(Logger::LogLevel::Error, "Failed to inject interrupt: HRESULT " + std::to_string(result) +
+            ", partitionHandle_ = " + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)) +
+            ", interruptControl.Type = " + std::to_string(interruptControl.Type) +
+            ", interruptControl.Vector = " + std::to_string(interruptControl.Vector));
+        logger_.LogStackTrace();
     }
     else
     {

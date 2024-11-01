@@ -2,6 +2,7 @@
 #include <iostream>
 #include <limits>
 #include <conio.h>
+#include "Registers.h"
 
 HypervisorStateMachine::HypervisorStateMachine(size_t memorySize)
     : memorySize_(memorySize), currentState_(State::Initializing), running_(false),
@@ -25,6 +26,7 @@ void HypervisorStateMachine::Start()
     CheckHypervisorCapability();
     SetupPartition();
     InitializeComponents();
+    memoryManager_.UpdateMemorySize(memorySize_);
     RunHypervisor();
 }
 
@@ -33,28 +35,97 @@ void HypervisorStateMachine::Stop()
     running_ = false;
 }
 
-void HypervisorStateMachine::RunGUI(HWND hwnd)
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    this->hwnd = hwnd;
-    RunGui();
+    HypervisorStateMachine* hypervisor = reinterpret_cast<HypervisorStateMachine*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
+        return true;
+
+    switch (msg)
+    {
+    case WM_SIZE:
+        if (hypervisor && hypervisor->g_pd3dDevice != NULL && wParam != SIZE_MINIMIZED)
+        {
+            hypervisor->CleanupRenderTarget();
+            hypervisor->g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
+            hypervisor->CreateRenderTarget();
+        }
+        return 0;
+
+    case WM_SYSCOMMAND:
+        if ((wParam & 0xFFF0) == SC_CLOSE)
+        {
+            PostQuitMessage(0);
+        }
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    }
+
+    return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
 void HypervisorStateMachine::RunGui()
 {
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("MicroHypervisor"), NULL };
+    RegisterClassEx(&wc);
+    HWND hwnd = CreateWindow(wc.lpszClassName, _T("MicroHypervisor GUI"), WS_OVERLAPPEDWINDOW, 100, 100, 800, 600, NULL, NULL, wc.hInstance, NULL);
+
+    if (!hwnd)
+    {
+        std::cerr << "[Error]: Failed to create GUI window.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to create GUI window.");
+        UnregisterClass(wc.lpszClassName, wc.hInstance);
+        return;
+    }
+
+    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+    ShowWindow(hwnd, SW_SHOWDEFAULT);
+    UpdateWindow(hwnd);
+
+    if (!CreateDeviceD3D(hwnd))
+    {
+        std::cerr << "[Error]: Failed to create Direct3D device.\n";
+        logger_.Log(Logger::LogLevel::Error, "Failed to create Direct3D device.");
+        CleanupDeviceD3D();
+        DestroyWindow(hwnd);
+        UnregisterClass(wc.lpszClassName, wc.hInstance);
+        return;
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
 
     ImGui::StyleColorsDark();
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowBorderSize = 1.0f;
+    style.FrameBorderSize = 1.0f;
+    style.PopupBorderSize = 1.0f;
+    style.ItemSpacing = ImVec2(10, 5);
+    style.WindowPadding = ImVec2(10, 10);
 
-    if (!CreateDeviceD3D(hwnd))
-    {
-        CleanupDeviceD3D();
-        return;
-    }
+    ImVec4* colors = ImGui::GetStyle().Colors;
+    colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
+    colors[ImGuiCol_Header] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(0.4f, 0.4f, 0.4f, 1.0f);
+    colors[ImGuiCol_Button] = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
 
-    ShowWindow(hwnd, SW_SHOWDEFAULT);
-    UpdateWindow(hwnd);
+    ImGui_ImplWin32_Init(hwnd);
+    ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+
+    static size_t newMemorySize = memorySize_;
+
+    logger_.SetLogCallback([this](const std::string& logMessage) {
+        outputBuffer << logMessage << "\n";
+    });
 
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
@@ -71,8 +142,118 @@ void HypervisorStateMachine::RunGui()
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("MicroHypervisor GUI", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("Memory Size: %zu bytes", memorySize_);
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("File"))
+            {
+                if (ImGui::MenuItem("Exit"))
+                {
+                    PostMessage(hwnd, WM_CLOSE, 0, 0);
+                }
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Hypervisor"))
+            {
+                if (ImGui::MenuItem("Start"))
+                {
+                    HandleMenuOption(MenuOption::Start);
+                }
+                if (ImGui::MenuItem("Stop"))
+                {
+                    HandleMenuOption(MenuOption::Stop);
+                }
+                if (ImGui::MenuItem("Restart"))
+                {
+                    HandleMenuOption(MenuOption::Restart);
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem("Save Snapshot"))
+                {
+                    HandleMenuOption(MenuOption::SaveSnapshot);
+                }
+                if (ImGui::MenuItem("Restore Snapshot"))
+                {
+                    HandleMenuOption(MenuOption::RestoreSnapshot);
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem("Dump Registers"))
+                {
+                    HandleMenuOption(MenuOption::DumpRegisters);
+                }
+                if (ImGui::MenuItem("Set Registers"))
+                {
+                    HandleMenuOption(MenuOption::SetRegisters);
+                }
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Advanced"))
+            {
+                if (ImGui::MenuItem("Get Registers"))
+                {
+                    HandleMenuOption(MenuOption::GetRegisters);
+                }
+                if (ImGui::MenuItem("Set Specific Register"))
+                {
+                    HandleMenuOption(MenuOption::SetSpecificRegister);
+                }
+                if (ImGui::MenuItem("Get Specific Register"))
+                {
+                    HandleMenuOption(MenuOption::GetSpecificRegister);
+                }
+                if (ImGui::MenuItem("Configure VM"))
+                {
+                    HandleMenuOption(MenuOption::ConfigureVM);
+                }
+                if (ImGui::MenuItem("Get VM Config"))
+                {
+                    HandleMenuOption(MenuOption::GetVMConfig);
+                }
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Settings"))
+            {
+                ImGui::InputScalar("Set Memory Size", ImGuiDataType_U64, &newMemorySize, NULL, NULL, "%zu", ImGuiInputTextFlags_CharsHexadecimal);
+                if (ImGui::Button("Update Memory Size"))
+                {
+                    if (newMemorySize > 0)
+                    {
+                        memorySize_ = newMemorySize;
+                        memoryManager_.UpdateMemorySize(memorySize_);
+                        logger_.Log(Logger::LogLevel::Info, "Memory size updated to " + std::to_string(memorySize_) + " bytes.");
+                    }
+                    else
+                    {
+                        logger_.Log(Logger::LogLevel::Error, "Invalid memory size: " + std::to_string(newMemorySize));
+                    }
+                }
+                ImGui::EndMenu();
+            }
+
+            ImGui::EndMainMenuBar();
+        }
+
+        ImGui::Begin("Resource Monitoring");
+        ImGui::Text("CPU Usage: %.1f%%", virtualProcessor_->GetCPUUsage());
+        //ImGui::Text("Memory Usage: %zu / %zu bytes", memoryManager_.GetCurrentUsage(), memorySize_);
+        ImGui::Text("Active Threads: %d", virtualProcessor_->GetActiveThreadCount());
+
+        const char* stateStr = "Unknown";
+        {
+            std::lock_guard<std::mutex> lock(stateMutex);
+            switch (currentState_)
+            {
+            case State::Initializing: stateStr = "Initializing"; break;
+            case State::Ready: stateStr = "Ready"; break;
+            case State::Running: stateStr = "Running"; break;
+            case State::Stopped: stateStr = "Stopped"; break;
+            case State::Error: stateStr = "Error"; break;
+            }
+        }
+
+        ImGui::Text("Current State: %s", stateStr);
 
         {
             std::lock_guard<std::mutex> lock(outputMutex);
@@ -81,25 +262,7 @@ void HypervisorStateMachine::RunGui()
             ImGui::EndChild();
         }
 
-        if (ImGui::Button("Start Hypervisor"))
-        {
-            {
-                std::lock_guard<std::mutex> lock(outputMutex);
-                outputBuffer.str("");
-                outputBuffer.clear();
-                outputBuffer << "Starting hypervisor...\n";
-            }
-
-            ImGui::BeginDisabled();
-
-            std::thread([=]() mutable {
-                Start();
-                }).detach();
-
-            ImGui::EndDisabled();
-        }
         ImGui::End();
-
         ImGui::Render();
         const float clear_color_with_alpha[4] = { 0.45f, 0.55f, 0.60f, 1.00f };
         g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, NULL);
@@ -108,10 +271,12 @@ void HypervisorStateMachine::RunGui()
         g_pSwapChain->Present(1, 0);
     }
 
-    // Cleanup
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+    CleanupDeviceD3D();
+    DestroyWindow(hwnd);
+    UnregisterClass(wc.lpszClassName, wc.hInstance);
 }
 
 void HypervisorStateMachine::CheckHypervisorCapability()
@@ -291,6 +456,173 @@ void HypervisorStateMachine::InitializeComponents()
     TransitionState(State::Running);
 }
 
+void HypervisorStateMachine::HandleMenuOption(MenuOption option)
+{
+    switch (option)
+    {
+    case MenuOption::Continue:
+        if (!running_)
+        {
+            running_ = true;
+            logger_.Log(Logger::LogLevel::Error, "Hypervisor is not running.");
+            TransitionState(State::Running);
+            std::thread([this]() { RunHypervisor(); }).detach();
+        }
+        else
+        {
+            logger_.Log(Logger::LogLevel::Info, "Continue action triggered.");
+            logger_.LogStackTrace();
+        }
+        break;
+    case MenuOption::Restart:
+        if (virtualProcessor_ != nullptr)
+        {
+            virtualProcessor_->RestoreState();
+            running_ = true;
+            logger_.Log(Logger::LogLevel::Info, "Restart action triggered.");
+            TransitionState(State::Running);
+            std::thread([this]() { RunHypervisor(); }).detach();
+        }
+        else
+        {
+            logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+			logger_.LogStackTrace();
+        }
+		break;
+    case MenuOption::Stop:
+		running_ = false;
+        if (virtualProcessor_ != nullptr)
+		{
+			virtualProcessor_->SaveState();
+		}
+        logger_.Log(Logger::LogLevel::Info, "Stop action triggered.");
+        TransitionState(State::Stopped);
+		break;
+    case MenuOption::Start:
+		if (!running_)
+		{
+			running_ = true;
+			logger_.Log(Logger::LogLevel::Info, "Start action triggered.");
+			TransitionState(State::Running);
+            std::thread([this]() { Start(); }).detach();
+		}
+        else
+        {
+            logger_.Log(Logger::LogLevel::Error, "Hypervisor is already running.");
+            logger_.LogStackTrace();
+        }
+        break;
+    case MenuOption::SaveSnapshot:
+        snapshotManager_.SaveSnapshot();
+        break;
+    case MenuOption::RestoreSnapshot:
+        snapshotManager_.RestoreSnapshot();
+		break;
+    case MenuOption::DumpRegisters:
+		if (virtualProcessor_ != nullptr)
+		{
+			virtualProcessor_->DumpRegisters();
+		}
+		else
+		{
+			logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+            logger_.LogStackTrace();
+        }
+        break;
+    case MenuOption::DetailedDumpRegisters:
+        if (virtualProcessor_ != nullptr)
+        {
+			virtualProcessor_->DetailedDumpRegisters();
+		}
+		else
+		{
+			logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+			logger_.LogStackTrace();
+		}
+        break;
+    case MenuOption::SetRegisters:
+		if (virtualProcessor_ != nullptr)
+		{
+			virtualProcessor_->SetRegisters();
+		}
+		else
+		{
+			logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+			logger_.LogStackTrace();
+		}
+		break;
+    case MenuOption::GetRegisters:
+        if (virtualProcessor_ != nullptr)
+        {
+			virtualProcessor_->GetRegisters();
+		}
+		else
+		{
+			logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+			logger_.LogStackTrace();
+		}
+        break;
+    case MenuOption::SetSpecificRegister:
+        if (virtualProcessor_ != nullptr)
+		{
+			virtualProcessor_->SetSpecificRegister(WHvX64RegisterRip, 0x1000);
+			virtualProcessor_->SetSpecificRegister(WHvX64RegisterRflags, 0x2);
+			virtualProcessor_->SetSpecificRegister(WHvX64RegisterCs, 0x8);
+		}
+		else
+		{
+			logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+			logger_.LogStackTrace();
+		}
+		break;
+    case MenuOption::GetSpecificRegister:
+        if (virtualProcessor_ != nullptr)
+        {
+            virtualProcessor_->GetSpecificRegister(WHvX64RegisterRip);
+            virtualProcessor_->GetSpecificRegister(WHvX64RegisterRflags);
+            virtualProcessor_->GetSpecificRegister(WHvX64RegisterCs);
+        }
+        else
+        {
+            logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+            logger_.LogStackTrace();
+        }
+        break;
+    case MenuOption::ConfigureVM:
+        if (virtualProcessor_ != nullptr)
+		{
+			VirtualProcessor::VMConfig config;
+			config.cpuCount = 1;
+			config.memorySize = 4194304;
+			config.ioDevices = "COM1, COM2, LPT1";
+			virtualProcessor_->ConfigureVM(config);
+		}
+		else
+		{
+			logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+			logger_.LogStackTrace();
+		}
+		break;
+    case MenuOption::GetVMConfig:
+        if (virtualProcessor_ != nullptr)
+		{
+			VirtualProcessor::VMConfig config = virtualProcessor_->GetVMConfig();
+			logger_.Log(Logger::LogLevel::Info, "VM configured with " + std::to_string(config.cpuCount) + " CPU(s), " +
+				std::to_string(config.memorySize) + " bytes of memory, I/O devices: " + config.ioDevices);
+		}
+		else
+		{
+			logger_.Log(Logger::LogLevel::Error, "VirtualProcessor instance is null.");
+			logger_.LogStackTrace();
+		}
+		break;
+    default:
+        logger_.Log(Logger::LogLevel::Error, "Invalid menu option.");
+		logger_.LogStackTrace();
+        break;
+    }
+}
+
 bool HypervisorStateMachine::RunHypervisor()
 {
     running_ = true;
@@ -370,6 +702,7 @@ void HypervisorStateMachine::PrintOutputBuffer()
 
     if (!output.empty())
     {
+        std::lock_guard<std::mutex> lock(outputMutex);
         std::cout << output;
     }
 }
@@ -377,6 +710,8 @@ void HypervisorStateMachine::PrintOutputBuffer()
 void HypervisorStateMachine::TransitionState(State newState)
 {
     std::string stateMessage;
+    std::lock_guard<std::mutex> lock(stateMutex);
+    currentState_ = newState;
     switch (newState)
     {
     case State::Initializing:
@@ -497,8 +832,14 @@ size_t HypervisorStateMachine::GetMemorySize() const
 
 bool HypervisorStateMachine::CreateDeviceD3D(HWND hWnd)
 {
-    DXGI_SWAP_CHAIN_DESC sd;
-    ZeroMemory(&sd, sizeof(sd));
+    if (!hWnd)
+    {
+        logger_.Log(Logger::LogLevel::Error, "HWND is NULL in CreateDeviceD3D.");
+        logger_.LogStackTrace();
+        return false;
+    }
+
+    DXGI_SWAP_CHAIN_DESC sd = {};
     sd.BufferCount = 2;
     sd.BufferDesc.Width = 0;
     sd.BufferDesc.Height = 0;
@@ -513,27 +854,32 @@ bool HypervisorStateMachine::CreateDeviceD3D(HWND hWnd)
     sd.Windowed = TRUE;
     sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
-    if (!hWnd)
-    {
-        logger_.Log(Logger::LogLevel::Error, "HWND is NULL in CreateDeviceD3D.");
-        logger_.LogStackTrace();
-        return false;
-    }
-
     UINT createDeviceFlags = 0;
     D3D_FEATURE_LEVEL featureLevel;
-    const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
-    HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
+    const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0 };
+
+    HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
+        featureLevelArray, ARRAYSIZE(featureLevelArray),
+        D3D11_SDK_VERSION, &sd, &g_pSwapChain,
+        &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
     if (FAILED(res))
     {
         logger_.Log(Logger::LogLevel::Error, "D3D11CreateDeviceAndSwapChain failed with HRESULT: 0x" + std::to_string(res));
         logger_.LogStackTrace();
-        return false;
+
+        if (res == DXGI_ERROR_UNSUPPORTED)
+        {
+            res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags,
+                featureLevelArray, ARRAYSIZE(featureLevelArray),
+                D3D11_SDK_VERSION, &sd, &g_pSwapChain,
+                &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
+            if (FAILED(res))
+            {
+                logger_.Log(Logger::LogLevel::Error, "WARP D3D11CreateDeviceAndSwapChain failed with HRESULT: 0x" + std::to_string(res));
+                return false;
+            }
+        }
     }
-    if (res == DXGI_ERROR_UNSUPPORTED)
-        res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
-    if (res != S_OK)
-        return false;
 
     CreateRenderTarget();
     return true;
@@ -549,7 +895,7 @@ void HypervisorStateMachine::CleanupDeviceD3D()
 
 void HypervisorStateMachine::CreateRenderTarget()
 {
-    ID3D11Texture2D* pBackBuffer;
+    ID3D11Texture2D* pBackBuffer = nullptr;
     g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
     if (pBackBuffer == nullptr)
     {

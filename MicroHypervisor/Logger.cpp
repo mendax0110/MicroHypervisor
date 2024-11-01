@@ -1,13 +1,27 @@
 #include "Logger.h"
 
-Logger::Logger(const std::string& logFile)
+Logger::Logger(const std::string& logFile) : stopLogging_(false)
 {
 	InitializeDbgHelp();
 	SetLogFile(logFile);
+	logThread_ = std::thread([this]()
+	{
+		while (!stopLogging_)
+		{
+			FlushDeferredLogs();
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+	});
 }
 
 Logger::~Logger()
 {
+	stopLogging_ = true;
+	cv_.notify_all();
+	if (logThread_.joinable())
+	{
+		logThread_.join();
+	}
 	if (logStream_.is_open())
 	{
 		logStream_.close();
@@ -27,6 +41,13 @@ void Logger::Log(LogLevel level, const std::string& message)
 	{
 		std::string logMessage = GetCurrentTimeLog() + " [" + LogLevelToString(level) + "] " + message + "\n";
 		logStream_ << logMessage << std::flush;
+		outputBuffer_.push(logMessage);
+		cv_.notify_all();
+
+		if (logCallback_)
+		{
+			logCallback_(logMessage);
+		}
 
 		switch (level)
 		{
@@ -88,12 +109,29 @@ void Logger::LogStackTrace()
 	Log(LogLevel::Info, stackTrace.str());
 }
 
+bool Logger::dbg_ = false;
+std::mutex Logger::dbgMutex_;
+
 void Logger::InitializeDbgHelp()
 {
-	SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
-	if (!SymInitialize(GetCurrentProcess(), nullptr, TRUE))
+	std::lock_guard<std::mutex> lock(dbgMutex_);
+	if (dbg_)
+		return;
+
+	SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
+	auto process = GetCurrentProcess();
+	auto currentDirectory = GetCurrentDirectoryA(0, nullptr);
+	auto buffer = std::make_unique<char[]>(currentDirectory);
+
+	GetCurrentDirectoryA(currentDirectory, buffer.get());
+	if (!SymInitialize(process, buffer.get(), TRUE))
 	{
 		std::cerr << "[Error]: Failed to initialize DbgHelp\n";
+	}
+	else
+	{
+		dbg_ = true;
+		std::cout << "[Info]: DbgHelp initialized\n";
 	}
 }
 
@@ -167,4 +205,25 @@ std::string Logger::LogLevelToString(LogLevel level)
 		default:
 			return "UNKNOWN";
 	}
+}
+
+void Logger::ProcessOutputBuffer()
+{
+	while (!stopLogging_)
+	{
+		std::unique_lock<std::mutex> lock(mutex_);
+		cv_.wait(lock, [this] { return !logStack_.empty() || stopLogging_; });
+
+		while (!outputBuffer_.empty())
+		{
+			std::string logMessage = outputBuffer_.front();
+			outputBuffer_.pop();
+		}
+	}
+}
+
+void Logger::SetLogCallback(LogCallback callback)
+{
+	std::lock_guard<std::mutex> lock(mutex_);
+	logCallback_ = callback;
 }

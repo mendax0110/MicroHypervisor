@@ -89,4 +89,25 @@ namespace PDE64
     constexpr uint32_t G = (1u << 8);
 }
 
+/// @namespace ProcCounters
+namespace ProcCounters
+{
+    struct WHV_VIRTUAL_PROCESSOR_COUNTERS
+    {
+        UINT64 TotalRuntime100ns;
+        UINT64 TotalWaitTime100ns;
+        UINT64 TotalDispatchCount;
+        UINT64 TotalInterrupts;
+        UINT64 TotalExceptions;
+        UINT64 TotalIoInstructions;
+        UINT64 TotalMmioInstructions;
+        UINT64 TotalIoPortInstructions;
+        UINT64 TotalIoPortAccesses;
+        UINT64 TotalMemoryInstructions;
+        UINT64 TotalMemoryAccesses;
+        UINT64 TotalMemoryReads;
+        UINT64 TotalMemoryWrites;
+    };
+}
+
 #endif // REGISTERS_H

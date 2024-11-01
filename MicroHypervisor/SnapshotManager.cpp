@@ -21,7 +21,13 @@ void SnapshotManager::RestoreSnapshot()
 {
     if (!savedRegisters_.empty())
     {
-        logger_.Log(Logger::LogLevel::Info, "Restoring snapshot.");
+        auto result = WHvSetVirtualProcessorRegisters(
+			partitionHandle_, 0, nullptr, 0, savedRegisters_.data()
+		);
+        logger_.Log(Logger::LogLevel::Info, "Restoring snapshot." 
+            + std::to_string(result) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)) + ", registerCount = "
+            + std::to_string(savedRegisters_.size()));
     }
     else
     {
@@ -37,13 +43,17 @@ bool SnapshotManager::Initialize()
 
     if (FAILED(result))
 	{
-        logger_.Log(Logger::LogLevel::Error, "Failed to initialize SnapshotManager: HRESULT " + std::to_string(result));
+        logger_.Log(Logger::LogLevel::Error, "Failed to initialize SnapshotManager: HRESULT "
+            + std::to_string(result) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
         logger_.LogStackTrace();
 		return false;
 	}
     else
     {
-        logger_.Log(Logger::LogLevel::Info, "SnapshotManager initialized successfully.");
+        logger_.Log(Logger::LogLevel::Info, "SnapshotManager initialized successfully." 
+			+ std::to_string(result) + ", partitionHandle = "
+			+ std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
 		return true;
     }
 }
