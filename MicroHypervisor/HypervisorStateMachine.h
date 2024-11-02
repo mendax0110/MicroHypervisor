@@ -258,6 +258,11 @@ private:
 
     bool guiMode_ = false;
     volatile bool pendingInterrupt_ = false;
+
+    std::atomic<UINT64> cpuUsage_{ 0 };
+    std::atomic<UINT> activeThreadCount_{ 0 };
+    std::atomic<size_t> memoryUsage_{ 0 };
+    std::mutex dataMutex_;
 };
 
 #endif // HYPERVISOR_STATE_MACHINE_H

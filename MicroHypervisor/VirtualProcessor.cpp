@@ -2,6 +2,8 @@
 #include <iostream>
 #include <iomanip>
 #include "InterruptController.h"
+#include <cassert>
+#include <cstdlib>
 
 VirtualProcessor::VirtualProcessor(WHV_PARTITION_HANDLE partitionHandle, UINT index)
     : partitionHandle_(partitionHandle), index_(index), registers_(std::size(regNames)), 
@@ -121,53 +123,57 @@ UINT64 VirtualProcessor::GetSpecificRegister(WHV_REGISTER_NAME regName)
 
 void VirtualProcessor::DumpRegisters()
 {
-    GetRegisters();
-    std::cout << "Register Dump: \n";
-    for (const auto& reg : registers_)
+    if (SUCCEEDED(GetRegisters()))
     {
-        std::cout << "Reg = " << std::hex << reg.Reg64 << std::dec << "\n";
+        std::cout << "Register Dump: \n";
+        for (const auto& reg : registers_)
+        {
+            std::cout << "Reg = " << std::hex << reg.Reg64 << std::dec << "\n";
+        }
     }
 }
 
 void VirtualProcessor::DetailedDumpRegisters()
 {
-    GetRegisters();
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
-    std::cout << "Detailed Register Dump: \n";
-    for (const auto& reg : registers_)
+    if (SUCCEEDED(GetRegisters()))
     {
-        std::cout << "Reg = " << std::hex << reg.Reg64 << "\n";
+        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "Detailed Register Dump: \n";
+        for (const auto& reg : registers_)
+        {
+            std::cout << "Reg = " << std::hex << reg.Reg64 << "\n";
+        }
+        std::cout << "----------------------------------------------------------------------------" << std::endl;
+
+        std::cout << "Segment Registers: \n";
+        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "ES = " << std::hex << GetSpecificRegister(WHvX64RegisterEs) << std::dec << "\n";
+        std::cout << "CS = " << std::hex << GetSpecificRegister(WHvX64RegisterCs) << std::dec << "\n";
+        std::cout << "SS = " << std::hex << GetSpecificRegister(WHvX64RegisterSs) << std::dec << "\n";
+        std::cout << "DS = " << std::hex << GetSpecificRegister(WHvX64RegisterDs) << std::dec << "\n";
+        std::cout << "FS = " << std::hex << GetSpecificRegister(WHvX64RegisterFs) << std::dec << "\n";
+        std::cout << "GS = " << std::hex << GetSpecificRegister(WHvX64RegisterGs) << std::dec << "\n";
+        std::cout << "----------------------------------------------------------------------------" << std::endl;
+
+        std::cout << "Control Registers: \n";
+        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "GDTR = " << std::hex << GetSpecificRegister(WHvX64RegisterGdtr) << std::dec << "\n";
+        std::cout << "CR0 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr0) << std::dec << "\n";
+        std::cout << "CR2 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr2) << std::dec << "\n";
+        std::cout << "CR3 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr3) << std::dec << "\n";
+        std::cout << "CR4 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr4) << std::dec << "\n";
+        std::cout << "CR8 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr8) << std::dec << "\n";
+        std::cout << "EFER = " << std::hex << GetSpecificRegister(WHvX64RegisterEfer) << std::dec << "\n";
+        std::cout << "LSTAR = " << std::hex << GetSpecificRegister(WHvX64RegisterLstar) << std::dec << "\n";
+        std::cout << "Pending Interruption = " << std::hex << GetSpecificRegister(WHvRegisterPendingInterruption) << std::dec << "\n";
+        std::cout << "----------------------------------------------------------------------------" << std::endl;
+
+        std::cout << "Other Registers: \n";
+        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "RIP = " << std::hex << GetSpecificRegister(WHvX64RegisterRip) << std::dec << "\n";
+        std::cout << "RFLAGS = " << std::hex << GetSpecificRegister(WHvX64RegisterRflags) << std::dec << "\n";
+        std::cout << "----------------------------------------------------------------------------" << std::endl;
     }
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
-
-    std::cout << "Segment Registers: \n";
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
-    std::cout << "ES = " << std::hex << GetSpecificRegister(WHvX64RegisterEs) << std::dec << "\n";
-    std::cout << "CS = " << std::hex << GetSpecificRegister(WHvX64RegisterCs) << std::dec << "\n";
-    std::cout << "SS = " << std::hex << GetSpecificRegister(WHvX64RegisterSs) << std::dec << "\n";
-    std::cout << "DS = " << std::hex << GetSpecificRegister(WHvX64RegisterDs) << std::dec << "\n";
-    std::cout << "FS = " << std::hex << GetSpecificRegister(WHvX64RegisterFs) << std::dec << "\n";
-    std::cout << "GS = " << std::hex << GetSpecificRegister(WHvX64RegisterGs) << std::dec << "\n";
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
-
-    std::cout << "Control Registers: \n";
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
-    std::cout << "GDTR = " << std::hex << GetSpecificRegister(WHvX64RegisterGdtr) << std::dec << "\n";
-    std::cout << "CR0 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr0) << std::dec << "\n";
-    std::cout << "CR2 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr2) << std::dec << "\n";
-    std::cout << "CR3 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr3) << std::dec << "\n";
-    std::cout << "CR4 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr4) << std::dec << "\n";
-    std::cout << "CR8 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr8) << std::dec << "\n";
-    std::cout << "EFER = " << std::hex << GetSpecificRegister(WHvX64RegisterEfer) << std::dec << "\n";
-    std::cout << "LSTAR = " << std::hex << GetSpecificRegister(WHvX64RegisterLstar) << std::dec << "\n";
-    std::cout << "Pending Interruption = " << std::hex << GetSpecificRegister(WHvRegisterPendingInterruption) << std::dec << "\n";
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
-    
-    std::cout << "Other Registers: \n";
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
-    std::cout << "RIP = " << std::hex << GetSpecificRegister(WHvX64RegisterRip) << std::dec << "\n";
-    std::cout << "RFLAGS = " << std::hex << GetSpecificRegister(WHvX64RegisterRflags) << std::dec << "\n";
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
 }
 
 HRESULT VirtualProcessor::SaveState()
@@ -224,13 +230,22 @@ HRESULT VirtualProcessor::RestoreState()
     return SetRegisters();
 }
 
-void VirtualProcessor::ConfigureVM(const VMConfig& config)
+HRESULT VirtualProcessor::ConfigureVM(const VMConfig& config)
 {
     vmConfig_ = config;
-    std::cout << "VM configured with "
-        << vmConfig_.cpuCount << " CPU(s), "
-        << vmConfig_.memorySize << " bytes of memory, "
-        << "I/O devices: " << vmConfig_.ioDevices << std::endl;
+    UINT32 cpuCount = config.cpuCount;
+    auto result = WHvSetPartitionProperty(partitionHandle_, WHvPartitionPropertyCodeProcessorCount, &cpuCount, sizeof(cpuCount));
+    if (FAILED(result))
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to set partition property (cpu count).");
+        return result;
+    }
+    logger_.Log(Logger::LogLevel::Info, "Partition property (cpu count) set successfully." 
+		+ std::to_string(result) + ", cpuCount = "
+		+ std::to_string(cpuCount) + ", partitionHandle = "
+		+ std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+    return result;
+
 }
 
 VirtualProcessor::VMConfig VirtualProcessor::GetVMConfig() const
@@ -240,84 +255,196 @@ VirtualProcessor::VMConfig VirtualProcessor::GetVMConfig() const
 
 UINT64 VirtualProcessor::GetCPUUsage()
 {
-    UINT64 cpuUsage = 0;
-    //HRESULT result = WHvGetVirtualProcessorCounters(partitionHandle_, index_, WHV_PROCESSOR_COUNTER_SET(0), 0, cpuUsage, nullptr);
+    if (partitionHandle_ == nullptr)
+    {
+        logger_.Log(Logger::LogLevel::Error, "Partition handle is invalid. Cannot get CPU usage.");
+        return 0;
+    }
 
-    //if (FAILED(result))
-    //{
-    //    logger_.Log(Logger::LogLevel::Error, "Failed to get CPU usage: HRESULT "
-    //        + std::to_string(result) + ", index = "
-    //        + std::to_string(index_) + ", partitionHandle = "
-    //        + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
-    //    return 0;
-    //}
+    UINT32 cpuUsage = 0;
+    HRESULT result = WHvGetVirtualProcessorCounters(partitionHandle_, index_, WHV_PROCESSOR_COUNTER_SET(0), 0, cpuUsage, nullptr);
 
-    //logger_.Log(Logger::LogLevel::Info, "CPU usage retrieved successfully: "
-    //    + std::to_string(cpuUsage) + ", index = "
-    //    + std::to_string(index_) + ", partitionHandle = "
-    //    + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+    if (FAILED(result))
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to get CPU usage: HRESULT "
+            + std::to_string(result) + ", index = "
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+        return 0;
+    }
+
+    logger_.Log(Logger::LogLevel::Info, "CPU usage retrieved successfully: "
+        + std::to_string(cpuUsage) + ", index = "
+        + std::to_string(index_) + ", partitionHandle = "
+        + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
 
     return cpuUsage;
 }
 
 UINT VirtualProcessor::GetActiveThreadCount()
-{
+{   
+    if (partitionHandle_ == nullptr)
+	{
+		logger_.Log(Logger::LogLevel::Error, "Partition handle is invalid. Cannot get active thread count.");
+		return 0;
+	}
+
     UINT32 activeThreadCount = 0;
-    //HRESULT result = WHvGetVirtualProcessorCounters(partitionHandle_, index_, WHV_PROCESSOR_COUNTER_SET(1), 0, activeThreadCount, nullptr);
+    HRESULT result = WHvGetVirtualProcessorCounters(partitionHandle_, index_, WHV_PROCESSOR_COUNTER_SET(1), 0, activeThreadCount, nullptr);
 
-    //if (FAILED(result))
-    //{
-    //    logger_.Log(Logger::LogLevel::Error, "Failed to get active thread count: HRESULT "
-    //        + std::to_string(result) + ", index = "
-    //        + std::to_string(index_) + ", partitionHandle = "
-    //        + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
-    //    return 0;
-    //}
+    if (FAILED(result))
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to get active thread count: HRESULT "
+            + std::to_string(result) + ", index = "
+            + std::to_string(index_) + ", partitionHandle = "
+            + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+        return 0;
+    }
 
-    //logger_.Log(Logger::LogLevel::Info, "Active thread count retrieved successfully: "
-    //    + std::to_string(activeThreadCount) + ", index = "
-    //    + std::to_string(index_) + ", partitionHandle = "
-    //    + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
+    logger_.Log(Logger::LogLevel::Info, "Active thread count retrieved successfully: "
+        + std::to_string(activeThreadCount) + ", index = "
+        + std::to_string(index_) + ", partitionHandle = "
+        + std::to_string(reinterpret_cast<uintptr_t>(partitionHandle_)));
 
     return activeThreadCount;
 }
 
+bool VirtualProcessor::SetupKernelMemory()
+{
+    auto kernel = static_cast<Kernel*>(_aligned_malloc(sizeof(Kernel), 4096));
+    if (!kernel)
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to allocate aligned memory for Kernel.");
+        return false;
+    }
+
+    memset(kernel, 0, sizeof(Kernel));
+    assert((reinterpret_cast<uintptr_t>(kernel) & (4096 - 1)) == 0);
+
+    kernel->pml4[0] = (kernel_start + offsetof(Kernel, pdpt)) | (PTE_P | PTE_RW | PTE_US);
+    kernel->pdpt[0] = 0x0 | (PTE_P | PTE_RW | PTE_US | PTE_PS);
+
+    auto result = WHvMapGpaRange(partitionHandle_, kernel, kernel_start, sizeof(Kernel),
+        WHvMapGpaRangeFlagRead | WHvMapGpaRangeFlagWrite);
+    if (FAILED(result))
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to map kernel memory.");
+        _aligned_free(kernel);
+        return false;
+    }
+
+    logger_.Log(Logger::LogLevel::Info, "Kernel memory setup successfully." 
+		+ std::to_string(result) + ", kernel = "
+		+ std::to_string(reinterpret_cast<uintptr_t>(kernel)) + ", kernel_start = "
+		+ std::to_string(kernel_start) + ", sizeof(Kernel) = "
+		+ std::to_string(sizeof(Kernel)));
+
+    _aligned_free(kernel);
+    return true;
+}
+
+
+bool VirtualProcessor::MapUserSpace()
+{
+    void* user_page = _aligned_malloc(4096, 4096);
+    if (!user_page)
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to allocate user space.");
+        return false;
+    }
+
+    memcpy(user_page, user_code[vendor], sizeof(user_code[vendor]));
+
+    auto result = WHvMapGpaRange(partitionHandle_, user_page, user_start, 4096,
+        WHvMapGpaRangeFlagRead | WHvMapGpaRangeFlagExecute);
+    if (FAILED(result))
+    {
+        logger_.Log(Logger::LogLevel::Error, "Failed to map user space.");
+        _aligned_free(user_page);
+        return false;
+    }
+
+    logger_.Log(Logger::LogLevel::Info, "User space mapped successfully."
+        + std::to_string(result) + ", user_page = "
+		+ std::to_string(reinterpret_cast<uintptr_t>(user_page)) + ", user_start = "
+		+ std::to_string(user_start) + ", 4096");
+
+    _aligned_free(user_page);
+    return true;
+}
+
+
 void VirtualProcessor::Run()
 {
-    //TODO FIX THIS!!!!
-    //SetRegisters();
-    SetSpecificRegister(WHvX64RegisterRip, 0x1000);
-    SetSpecificRegister(WHvX64RegisterRflags, 0x2);
-    SetSpecificRegister(WHvX64RegisterCs, 0x8);
-    
     if (partitionHandle_ == nullptr)
     {
         logger_.Log(Logger::LogLevel::Error, "Partition handle is invalid. Cannot run virtual processor.");
         return;
     }
 
-    //TODO FIX THIS!!!!
-    auto result = WHvRunVirtualProcessor(partitionHandle_, index_, 0, 0);
+    if (!SetupKernelMemory())
+    {
+        logger_.Log(Logger::LogLevel::Error, "Kernel memory setup failed.");
+        return;
+    }
 
-    if (result == S_OK)
-	{
-		logger_.Log(Logger::LogLevel::Info, "Virtual Processor is running.");
+    if (!MapUserSpace())
+    {
+        logger_.Log(Logger::LogLevel::Error, "User space mapping failed.");
+        return;
+    }
 
-		// Inject an interrupt
-		InterruptController interruptController(partitionHandle_);
-		if (interruptController.Setup())
-		{
-			interruptController.InjectInterrupt(0x20);
-		}
-		else
-		{
-			logger_.Log(Logger::LogLevel::Error, "Failed to setup Interrupt Controller.");
-			logger_.LogStackTrace();
+    SetRegisters();
+
+    WHV_RUN_VP_EXIT_CONTEXT context;
+    auto result = WHvRunVirtualProcessor(partitionHandle_, index_, &context, sizeof(context));
+
+    if (SUCCEEDED(result))
+    {
+        logger_.Log(Logger::LogLevel::Info, "Virtual Processor is running.");
+
+        UINT64 rip = GetSpecificRegister(WHvX64RegisterRip);
+        logger_.Log(Logger::LogLevel::Info, "Instruction Pointer (RIP): " + std::to_string(rip));
+
+        switch (context.ExitReason)
+        {
+        case WHvRunVpExitReasonHypercall:
+            logger_.Log(Logger::LogLevel::Info, "The vmcall instruction executed.");
+            //auto interruptController = InterruptController(partitionHandle_);
+            break;
+        case WHvRunVpExitReasonMemoryAccess:
+        {
+            // TODO: FIX THIS!!!
+            const auto& memoryAccessContext = context.MemoryAccess;
+
+            logger_.Log(Logger::LogLevel::Info, "Memory Access Exit Reason:");
+            logger_.Log(Logger::LogLevel::Info, "Instruction Byte Count: " + std::to_string(memoryAccessContext.InstructionByteCount));
+            logger_.Log(Logger::LogLevel::Info, "Guest Physical Address (GPA): " + std::to_string(memoryAccessContext.Gpa));
+            logger_.Log(Logger::LogLevel::Info, "Guest Virtual Address (GVA): " + std::to_string(memoryAccessContext.Gva));
+
+            if (memoryAccessContext.InstructionByteCount > 0)
+            {
+                std::string instructionBytes;
+                for (size_t i = 0; i < memoryAccessContext.InstructionByteCount; ++i)
+                {
+                    instructionBytes += "0x" + std::to_string(memoryAccessContext.InstructionBytes[i]) + " ";
+                }
+                logger_.Log(Logger::LogLevel::Info, "Instruction Bytes: " + instructionBytes);
+            }
+            else
+            {
+                logger_.Log(Logger::LogLevel::Info, "No instruction bytes to log.");
+            }
+        }
+        break;
+        default:
+            logger_.Log(Logger::LogLevel::Info, "Unhandled exit reason: " + std::to_string(context.ExitReason));
+            break;
         }
     }
     else
     {
-        logger_.Log(Logger::LogLevel::Error, "Virtual Processor failed to run." + std::to_string(result));
-        logger_.LogStackTrace();
+        logger_.Log(Logger::LogLevel::Error, "Failed to run Virtual Processor.");
     }
 }
+

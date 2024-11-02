@@ -1,5 +1,6 @@
 #include "MemoryManager.h"
 #include <iostream>
+#include <cassert>
 
 MemoryManager::MemoryManager(WHV_PARTITION_HANDLE partitionHandle, size_t memorySize)
     : partitionHandle_(partitionHandle), memorySize_(memorySize), logger_("MemoryManager.log")

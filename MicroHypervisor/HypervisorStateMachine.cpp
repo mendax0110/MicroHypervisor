@@ -182,6 +182,10 @@ void HypervisorStateMachine::RunGui()
                 {
                     HandleMenuOption(MenuOption::DumpRegisters);
                 }
+                if (ImGui::MenuItem("Detailed Dump Registers"))
+				{
+					HandleMenuOption(MenuOption::DetailedDumpRegisters);
+				}
                 if (ImGui::MenuItem("Set Registers"))
                 {
                     HandleMenuOption(MenuOption::SetRegisters);
@@ -237,9 +241,9 @@ void HypervisorStateMachine::RunGui()
         }
 
         ImGui::Begin("Resource Monitoring");
-        ImGui::Text("CPU Usage: %.1f%%", virtualProcessor_->GetCPUUsage());
-        //ImGui::Text("Memory Usage: %zu / %zu bytes", memoryManager_.GetCurrentUsage(), memorySize_);
-        ImGui::Text("Active Threads: %d", virtualProcessor_->GetActiveThreadCount());
+        ImGui::Text("CPU Usage: %.1f%%", static_cast<float>(cpuUsage_) / 100.0f);
+        ImGui::Text("Memory Usage: %zu / %zu bytes", static_cast<size_t>(memoryUsage_), memorySize_);
+        ImGui::Text("Active Threads: %d", static_cast<int>(activeThreadCount_));
 
         const char* stateStr = "Unknown";
         {
@@ -725,6 +729,13 @@ bool HypervisorStateMachine::RunHypervisor()
             TransitionState(State::Error);
             logger_.Log(Logger::LogLevel::Error, "Failed to save the state of the virtual processor.");
             return false;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(dataMutex_);
+            cpuUsage_ = virtualProcessor_->GetCPUUsage();
+            activeThreadCount_ = virtualProcessor_->GetActiveThreadCount();
+            memoryUsage_ = memoryManager_.GetCurrentUsage();
         }
 
         // Simulate hypervisor running

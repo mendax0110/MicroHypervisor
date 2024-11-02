@@ -36,7 +36,10 @@ public:
      */
     void UpdateMemorySize(size_t newMemorySize);
 
-    // method GetCurrentUsage()
+    /**
+     * @brief Gets the Current Memory Usage of the Partition
+     *
+     */
     UINT64 GetCurrentUsage();
 
 private:

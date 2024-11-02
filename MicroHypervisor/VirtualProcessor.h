@@ -33,8 +33,7 @@ public:
      *
      * @param config -> VMConfig, the configuration of the Virtual Machine
      */
-    void ConfigureVM(const VMConfig& config);
-
+    HRESULT ConfigureVM(const VMConfig& config);
 
     /**
      * @brief Gets the Virtual machine configuration
@@ -111,8 +110,23 @@ public:
      */
     UINT64 GetCPUUsage();
 
-    // GetActiveThreadCount() 
+    /**
+     * @brief Get the Active Thread Count
+     *
+     */
     UINT GetActiveThreadCount();
+
+    /**
+	 * @brief Setup of the Kernel Memory
+	 *
+	 */
+    bool SetupKernelMemory();
+
+    /**
+     * @brief Setup of the User Memory
+     *
+     */
+    bool MapUserSpace();
 
 private:
     UINT index_;
@@ -122,6 +136,21 @@ private:
     bool isRunning_;
     VMConfig vmConfig_;
     Logger logger_;
+
+    struct Kernel 
+    {
+        uint64_t pml4[512];
+        uint64_t pdpt[512];
+    };
+
+    const uint64_t kernel_start = 0x4000;
+    const uint64_t user_start = 0x100000000;
+    const uint64_t PTE_P = 1ULL << 0;
+    const uint64_t PTE_RW = 1ULL << 1;
+    const uint64_t PTE_US = 1ULL << 2;
+    const uint64_t PTE_PS = 1ULL << 7;
+    const uint8_t user_code[2][3] = { {0x0f, 0x01, 0xd9}, {0x0f, 0x01, 0xc1} };
+    int vendor;
 };
 
 #endif // VIRTUALPROCESSOR_H
