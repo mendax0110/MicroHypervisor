@@ -58,3 +58,8 @@ void InterruptController::InjectInterrupt(UINT32 interruptVector)
         logger_.Log(Logger::LogLevel::Info, "Injected interrupt vector: " + std::to_string(interruptVector));
     }
 }
+
+bool InterruptController::InterruptObserver(InterruptInfo& interruptInfo)
+{
+    return false;
+}

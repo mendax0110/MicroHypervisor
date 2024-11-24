@@ -105,12 +105,12 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\adria\Documents\git\MicroHypervisor\externals\imgui\backends;C:\Users\adria\Documents\git\MicroHypervisor\externals\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\%USERNAME%\Documents\git\MicroHypervisor\externals\imgui\backends;C:\Users\%USERNAME%\Documents\git\MicroHypervisor\externals\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>WinHvPlatform.lib;winhvemulation.lib;advapi32.lib;d3d11.lib;DbgHelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WinHvPlatform.lib;winhvemulation.lib;advapi32.lib;d3d11.lib;DbgHelp.lib;Ws2_32.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -135,8 +135,10 @@
     <ClInclude Include="InterruptController.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="MemoryManager.h" />
+    <ClInclude Include="NetworkManager.h" />
     <ClInclude Include="Partition.h" />
     <ClInclude Include="Registers.h" />
+    <ClInclude Include="RpcBase.h" />
     <ClInclude Include="SnapshotManager.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="VirtualProcessor.h" />
@@ -154,7 +156,9 @@
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MemoryManager.cpp" />
+    <ClCompile Include="NetworkManager.cpp" />
     <ClCompile Include="Partition.cpp" />
+    <ClCompile Include="RpcBase.cpp" />
     <ClCompile Include="SnapshotManager.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="VirtualProcessor.cpp" />

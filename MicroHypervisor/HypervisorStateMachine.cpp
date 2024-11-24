@@ -218,6 +218,42 @@ void HypervisorStateMachine::RunGui()
                 ImGui::EndMenu();
             }
 
+            if (ImGui::BeginMenu("Rpc-Menu"))
+            {
+                if (ImGui::MenuItem("Start Rpc"))
+                {
+                    std::string hypervisorIP = NetworkManager::GetHypervisorIPAddress();
+                    if (rpcBase_.StartRpc(hypervisorIP, 1234))
+                    {
+                        ImGui::Text("RPC server started successfully.");
+                    }
+                    else
+                    {
+                        ImGui::Text("Failed to start RPC server.");
+                    }
+                }
+
+                if (ImGui::MenuItem("Stop Rpc"))
+                {
+                    rpcBase_.StopRpc();
+                }
+
+                if (ImGui::MenuItem("Show IO Map"))
+                {
+                    auto io_map = rpcBase_.GetIoMap();
+                    for (const auto& [key, value] : io_map)
+                    {
+                        ImGui::Text("%s:", key.c_str());
+                        for (const auto& val : value)
+                        {
+                            ImGui::Text("  %s", val.c_str());
+                        }
+                    }
+                }
+
+                ImGui::EndMenu();
+            }
+
             if (ImGui::BeginMenu("Settings"))
             {
                 ImGui::InputScalar("Set Memory Size", ImGuiDataType_U64, &newMemorySize, NULL, NULL, "%zu", ImGuiInputTextFlags_CharsHexadecimal);
@@ -712,6 +748,7 @@ bool HypervisorStateMachine::RunHypervisor()
             {
             case MenuOption::Continue:
                 // Continue running the hypervisor
+                virtualProcessor_->Continue();
                 break;
             case MenuOption::Restart:
                 // Restart logic
@@ -840,6 +877,7 @@ void HypervisorStateMachine::DisplayUsageAndMenu()
     std::cout << "  -m, --memory <size>   Set the memory size in bytes (default: 4194304)\n";
     std::cout << "  --gui                 Launch GUI mode\n";
     std::cout << "  -h, --help            Show this help message\n\n";
+    std::cout << "#######################################################################\n";
 
     std::cout << "Hypervisor CLI Menu:\n"
         << "1. Start\n"
@@ -858,6 +896,7 @@ void HypervisorStateMachine::DisplayUsageAndMenu()
 HypervisorStateMachine::MenuOption HypervisorStateMachine::ShowMenu()
 {
     int choice = 0;
+    std::cout << "##########################\n";
     std::cout << "Hypervisor Menu:\n";
     std::cout << "1. Continue\n";
     std::cout << "2. Restart\n";

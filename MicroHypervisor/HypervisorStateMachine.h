@@ -21,8 +21,10 @@
 #include "InterruptController.h"
 #include "MemoryManager.h"
 #include "SnapshotManager.h"
+#include "RpcBase.h"
 #include "Timer.h"
 #include "Logger.h"
+#include "NetworkManager.h"
 
 class HypervisorGUI;
 
@@ -263,6 +265,8 @@ private:
     std::atomic<UINT> activeThreadCount_{ 0 };
     std::atomic<size_t> memoryUsage_{ 0 };
     std::mutex dataMutex_;
+
+    rpc::RpcBase rpcBase_;
 };
 
 #endif // HYPERVISOR_STATE_MACHINE_H

@@ -5,6 +5,7 @@
 #include <WinHvPlatform.h>
 #include <WinHvPlatformDefs.h>
 #include <vector>
+#include <map>
 #include "Logger.h"
 
 /// @brief Interrupt Controller class for the Hypervisor \class InterruptController
@@ -28,6 +29,22 @@ public:
      * @param interruptVector -> UINT32, Interrupt Vector to inject
      */
     void InjectInterrupt(UINT32 interruptVector);
+
+
+    typedef struct InterruptInfo
+    {
+        UINT32 interruptVector;
+        WHV_INTERRUPT_TYPE interruptType;
+        WHV_INTERRUPT_DESTINATION_MODE destinationMode;
+        UINT32 destination;
+        UINT32 reserved;
+    } InterruptInfo;
+
+    std::map<UINT32, std::string> interruptTypeMap =
+    {
+    };
+
+    bool InterruptObserver(InterruptInfo& interruptInfo);
 
 private:
     WHV_PARTITION_HANDLE partitionHandle_;

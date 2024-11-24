@@ -46,6 +46,8 @@ public:
      *
      */
     void Run();
+
+    bool Continue();
     
     /**
      * @brief Dump the Registers

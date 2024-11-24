@@ -7,7 +7,8 @@
 
 VirtualProcessor::VirtualProcessor(WHV_PARTITION_HANDLE partitionHandle, UINT index)
     : partitionHandle_(partitionHandle), index_(index), registers_(std::size(regNames)), 
-    isRunning_(false), savedRegisters_(), vmConfig_({1, 4194304, "none"}), logger_("VirtualProcessor.log")
+    isRunning_(false), savedRegisters_(), vmConfig_({1, 4194304, "none"}),
+    logger_("VirtualProcessor.log")
 {}
 
 VirtualProcessor::~VirtualProcessor()
@@ -17,7 +18,7 @@ VirtualProcessor::~VirtualProcessor()
 
 HRESULT VirtualProcessor::GetRegisters()
 {
-    auto result = WHvGetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), registers_.data());
+    auto result = WHvGetVirtualProcessorRegisters(partitionHandle_, index_, regNames, static_cast<UINT32>(std::size(regNames)), registers_.data());
     if (FAILED(result))
     {
         logger_.Log(Logger::LogLevel::Error, "Failed to get registers: HRESULT " 
@@ -38,7 +39,7 @@ HRESULT VirtualProcessor::GetRegisters()
 
 HRESULT VirtualProcessor::SetRegisters()
 {
-    auto result = WHvSetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), registers_.data());
+    auto result = WHvSetVirtualProcessorRegisters(partitionHandle_, index_, regNames, static_cast<UINT32>(std::size(regNames)), registers_.data());
     if (FAILED(result))
 	{
 		logger_.Log(Logger::LogLevel::Error, "Failed to set registers: HRESULT " 
@@ -184,7 +185,7 @@ HRESULT VirtualProcessor::SaveState()
     savedRegisters_ = registers_;
     isRunning_ = true;
 
-    auto result = WHvGetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), savedRegisters_.data());
+    auto result = WHvGetVirtualProcessorRegisters(partitionHandle_, index_, regNames, static_cast<UINT32>(std::size(regNames)), savedRegisters_.data());
     if (FAILED(result))
     {
         logger_.Log(Logger::LogLevel::Error, "Failed to save state: HRESULT " 
@@ -210,7 +211,7 @@ HRESULT VirtualProcessor::RestoreState()
 
     registers_ = savedRegisters_;
 
-    auto result = WHvSetVirtualProcessorRegisters(partitionHandle_, index_, regNames, std::size(regNames), registers_.data());
+    auto result = WHvSetVirtualProcessorRegisters(partitionHandle_, index_, regNames, static_cast<UINT32>(std::size(regNames)), registers_.data());
     if (FAILED(result))
 	{
 		logger_.Log(Logger::LogLevel::Error, "Failed to restore state: HRESULT " 
@@ -233,7 +234,7 @@ HRESULT VirtualProcessor::RestoreState()
 HRESULT VirtualProcessor::ConfigureVM(const VMConfig& config)
 {
     vmConfig_ = config;
-    UINT32 cpuCount = config.cpuCount;
+    UINT32 cpuCount = static_cast<UINT32>(config.cpuCount);
     auto result = WHvSetPartitionProperty(partitionHandle_, WHvPartitionPropertyCodeProcessorCount, &cpuCount, sizeof(cpuCount));
     if (FAILED(result))
     {
@@ -446,5 +447,29 @@ void VirtualProcessor::Run()
     {
         logger_.Log(Logger::LogLevel::Error, "Failed to run Virtual Processor.");
     }
+}
+
+bool VirtualProcessor::Continue()
+{
+    if (partitionHandle_ == nullptr)
+    {
+		logger_.Log(Logger::LogLevel::Error, "Partition handle is invalid. Cannot continue virtual processor.");
+		return false;
+	}
+
+    if (!SetupKernelMemory())
+    {
+        logger_.Log(Logger::LogLevel::Error, "Kernel memory setup failed.");
+        return false;
+    }
+
+    if (!MapUserSpace())
+    {
+        logger_.Log(Logger::LogLevel::Error, "User space mapping failed.");
+        return false;
+    }
+
+    return true;
+    // pick up the exisiting processor, and continue running it, instead of creating a new one
 }
 

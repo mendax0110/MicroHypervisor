@@ -78,8 +78,16 @@ void Logger::LogStackTrace()
 
 	frames = CaptureStackBackTrace(0, 100, stack, nullptr);
 	symbol = (SYMBOL_INFO*)calloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char), 1);
-	symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-	symbol->MaxNameLen = 255;
+	if (!symbol)
+	{
+		Log(LogLevel::Error, "Failed to allocate memory for symbol information");
+		return;
+	}
+	else
+	{
+		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+		symbol->MaxNameLen = 255;
+	}
 
 	std::ostringstream stackTrace;
 	stackTrace << GetCurrentTimeLog() << " [STACK TRACE]\n";
