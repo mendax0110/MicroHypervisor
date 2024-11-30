@@ -47,6 +47,11 @@ public:
      */
     void Run();
 
+    /**
+     * @brief Continues the Virtual Processor
+     * 
+     * @return -> true if the Virtual Processor is running, false otherwise
+     */
     bool Continue();
     
     /**

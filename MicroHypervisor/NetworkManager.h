@@ -9,6 +9,11 @@ public:
 	NetworkManager();
 	~NetworkManager();
 
+	/**
+	 * @brief Function to get the Hypervisor IP Address
+	 * 
+	 * @return 
+	 */
 	static std::string GetHypervisorIPAddress();
 
 

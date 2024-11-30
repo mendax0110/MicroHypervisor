@@ -31,6 +31,9 @@ public:
     void InjectInterrupt(UINT32 interruptVector);
 
 
+    /**
+     * @brief Structure to hold the Interrupt Information
+     */
     typedef struct InterruptInfo
     {
         UINT32 interruptVector;
@@ -44,6 +47,13 @@ public:
     {
     };
 
+    /**
+     * @brief Function to observe the interrupt
+     * 
+     * @param interruptInfo -> struct with the interrupt information
+     * 
+     * @return -> true if the interrupt is observed, false otherwise
+     */
     bool InterruptObserver(InterruptInfo& interruptInfo);
 
 private:
