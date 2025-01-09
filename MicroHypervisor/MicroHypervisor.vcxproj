@@ -137,6 +137,7 @@
     <ClInclude Include="MemoryManager.h" />
     <ClInclude Include="NetworkManager.h" />
     <ClInclude Include="Partition.h" />
+    <ClInclude Include="PtrUtils.h" />
     <ClInclude Include="Registers.h" />
     <ClInclude Include="RpcBase.h" />
     <ClInclude Include="SnapshotManager.h" />

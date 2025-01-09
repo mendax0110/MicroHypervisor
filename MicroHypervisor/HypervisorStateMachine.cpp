@@ -4,6 +4,7 @@
 #include <limits>
 #include <conio.h>
 #include "Registers.h"
+#include "PtrUtils.h"
 
 HypervisorStateMachine::HypervisorStateMachine(size_t memorySize)
     : memorySize_(memorySize), currentState_(State::Initializing), running_(false),
@@ -20,6 +21,7 @@ HypervisorStateMachine::~HypervisorStateMachine()
     logger_.Log(Logger::LogLevel::Info, "HypervisorStateMachine destroyed.");
     Stop();
     CleanupDeviceD3D();
+    tryDeletePtr(virtualProcessor_);
 }
 
 void HypervisorStateMachine::Start()

@@ -9,7 +9,9 @@ VirtualProcessor::VirtualProcessor(WHV_PARTITION_HANDLE partitionHandle, UINT in
     : partitionHandle_(partitionHandle), index_(index), registers_(std::size(regNames)), 
     isRunning_(false), savedRegisters_(), vmConfig_({1, 4194304, "none"}),
     logger_("VirtualProcessor.log")
-{}
+{
+
+}
 
 VirtualProcessor::~VirtualProcessor()
 {
@@ -138,26 +140,26 @@ void VirtualProcessor::DetailedDumpRegisters()
 {
     if (SUCCEEDED(GetRegisters()))
     {
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
         std::cout << "Detailed Register Dump: \n";
         for (const auto& reg : registers_)
         {
             std::cout << "Reg = " << std::hex << reg.Reg64 << "\n";
         }
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
 
         std::cout << "Segment Registers: \n";
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
         std::cout << "ES = " << std::hex << GetSpecificRegister(WHvX64RegisterEs) << std::dec << "\n";
         std::cout << "CS = " << std::hex << GetSpecificRegister(WHvX64RegisterCs) << std::dec << "\n";
         std::cout << "SS = " << std::hex << GetSpecificRegister(WHvX64RegisterSs) << std::dec << "\n";
         std::cout << "DS = " << std::hex << GetSpecificRegister(WHvX64RegisterDs) << std::dec << "\n";
         std::cout << "FS = " << std::hex << GetSpecificRegister(WHvX64RegisterFs) << std::dec << "\n";
         std::cout << "GS = " << std::hex << GetSpecificRegister(WHvX64RegisterGs) << std::dec << "\n";
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
 
         std::cout << "Control Registers: \n";
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
         std::cout << "GDTR = " << std::hex << GetSpecificRegister(WHvX64RegisterGdtr) << std::dec << "\n";
         std::cout << "CR0 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr0) << std::dec << "\n";
         std::cout << "CR2 = " << std::hex << GetSpecificRegister(WHvX64RegisterCr2) << std::dec << "\n";
@@ -167,13 +169,13 @@ void VirtualProcessor::DetailedDumpRegisters()
         std::cout << "EFER = " << std::hex << GetSpecificRegister(WHvX64RegisterEfer) << std::dec << "\n";
         std::cout << "LSTAR = " << std::hex << GetSpecificRegister(WHvX64RegisterLstar) << std::dec << "\n";
         std::cout << "Pending Interruption = " << std::hex << GetSpecificRegister(WHvRegisterPendingInterruption) << std::dec << "\n";
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
 
         std::cout << "Other Registers: \n";
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
         std::cout << "RIP = " << std::hex << GetSpecificRegister(WHvX64RegisterRip) << std::dec << "\n";
         std::cout << "RFLAGS = " << std::hex << GetSpecificRegister(WHvX64RegisterRflags) << std::dec << "\n";
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
+        std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
     }
 }
 

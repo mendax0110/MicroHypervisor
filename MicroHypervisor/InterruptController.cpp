@@ -8,7 +8,10 @@ InterruptController::InterruptController(WHV_PARTITION_HANDLE partitionHandle)
 
 }
 
-InterruptController::~InterruptController() {}
+InterruptController::~InterruptController()
+{
+
+}
 
 bool InterruptController::Setup()
 {
